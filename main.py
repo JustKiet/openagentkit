@@ -1,9 +1,9 @@
 from openagentkit.tools.search import search
 from openagentkit.tools.get_weather import get_weather
-from openagentkit.services.openai_speech_service import OpenAISpeechService
-from openagentkit.services.lightning_speech_service import LightningSpeechService
+from openagentkit.modules.openai import OpenAISpeechService
+from openagentkit.modules.smallestai.lightning_speech_service import LightningSpeechService
 from openagentkit.handlers import ContextHandler, OutputHandler, EventHandler
-from openagentkit.services import Executor
+from openagentkit.modules.common import Executor
 from openagentkit.core import AIAssistant
 from openai import AzureOpenAI
 import pprint
@@ -14,6 +14,7 @@ import os
 load_dotenv()
 
 client = AzureOpenAI()
+
 speech_client = LightningSpeechService()
 
 context_handler = ContextHandler()

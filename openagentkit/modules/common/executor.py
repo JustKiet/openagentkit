@@ -4,7 +4,7 @@ from loguru import logger
 from openai._types import NOT_GIVEN
 from openai import OpenAI
 from openagentkit.interfaces.base_executor import BaseExecutor
-from openagentkit.services.openai_llm_service import OpenAILLMService
+from openagentkit.modules.openai import OpenAILLMService
 from openagentkit.models import OpenAgentResponse
 from pydantic import BaseModel
 import json
