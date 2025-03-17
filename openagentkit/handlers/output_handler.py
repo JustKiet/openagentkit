@@ -1,12 +1,13 @@
 from openagentkit.interfaces.base_speech_model import BaseSpeechModel
 from openagentkit.models.responses import OpenAgentResponse
+from loguru import logger
 import json
 import base64
 
 class OutputHandler:
     def __init__(self,
-                 speech_client: BaseSpeechModel,
-                 event_handler,
+                 speech_client: BaseSpeechModel = None,
+                 event_handler = None,
                  *args,
                  **kwargs):
         self.speech_client = speech_client
@@ -14,9 +15,13 @@ class OutputHandler:
     
     def handle_output(self, output: OpenAgentResponse, speech: bool = False) -> OpenAgentResponse:
         """Handle the output from the AI model."""
-        if speech:
-            speech_bytes = self.speech_client.text_to_speech(output)
-            output.audio = base64.b64encode(speech_bytes).decode("utf-8") if speech_bytes else "No audio available."
+        if speech and self.speech_client:
+            try:
+                speech_bytes = self.speech_client.text_to_speech(output)
+                output.audio = base64.b64encode(speech_bytes).decode("utf-8") if speech_bytes else "No audio available."
+            except Exception as e:
+                output.audio = "No audio available."
+                logger.error(f"Error: {e}")
             return output
         else:
             return output

@@ -8,7 +8,7 @@ from openagentkit.modules.openai import OpenAILLMService
 from openagentkit.models import OpenAgentResponse
 from pydantic import BaseModel
 import json
-
+import datetime
 
 class Executor(BaseExecutor, OpenAILLMService):
     def __init__(self,
@@ -33,7 +33,21 @@ class Executor(BaseExecutor, OpenAILLMService):
             max_tokens=max_tokens,
             top_p=top_p,
         )
+
+    def define_system_message(self, message: Optional[str] = None) -> str:
+        if message is not None:
+            self._system_message = message
+        else:
+            self._system_message = """
+            System Message: You are an helpful assistant, try to assist the user in everything.\n
+            """
+        default_context_addon = f"""
+        Current date and time: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n
         
+        """
+        default_context_addon += self._system_message
+        return default_context_addon
+
     def execute(self, 
                 messages: List[Dict[str, str]],
                 tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,

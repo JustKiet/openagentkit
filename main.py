@@ -37,8 +37,6 @@ assistant = AIAssistant(
     output_handler=output_handler
 )
 
-assistant
-
 start_time = time.time()
 
 response = assistant.invoke(

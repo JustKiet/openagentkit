@@ -8,7 +8,7 @@ search_engine = DuckDuckGoSearchResults(output_format="list")
 @tool(
     description="Search for information using DuckDuckGo's search engine.",
 )
-def search(
+def duckduckgo_search_tool(
     query: Annotated[str, "The search query to look up."],
 ) -> DuckDuckGoResponse:
     """Search for information using DuckDuckGo's search engine."""

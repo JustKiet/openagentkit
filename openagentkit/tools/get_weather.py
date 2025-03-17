@@ -7,10 +7,10 @@ from openagentkit.models.tool_responses import WeatherForecast, CurrentWeather, 
 @tool(
     description="Get the weather forecast for a location. If no location is provided, the location will automatically be determined using the IP address.",
 )
-def get_weather(
+def get_weather_tool(
     mode: Annotated[Literal["current", "forecast", "both"], "Weather Response mode."],
     location: Annotated[Union[str, Literal["Unknown"]], "The location to get the weather forecast for."], 
-    days: Annotated[Union[int, Literal["Unknown"]], "The number of days to get the weather forecast for. Maximum of 3"] = 3,
+    days: Annotated[Union[int, Literal[0]], "The number of days to get the weather forecast for. Maximum of 3"] = 3,
     ) -> WeatherResponse:
     weather_api_key = os.getenv("WEATHERAPI_API_KEY")
     if weather_api_key is None:
