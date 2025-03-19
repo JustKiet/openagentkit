@@ -1,15 +1,15 @@
 from typing import Any, Callable, Dict, List, Optional, Union
-from openai import OpenAI
+from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN
 from pydantic import BaseModel
 from openagentkit.handlers.tool_handler import ToolHandler
-from openagentkit.interfaces.base_llm_model import BaseLLMModel
+from openagentkit.interfaces import AsyncBaseLLMModel
 from openagentkit.models import OpenAgentResponse
 import os
 
-class OpenAILLMService(BaseLLMModel):
+class AsyncOpenAILLMService(AsyncBaseLLMModel):
     def __init__(self, 
-                 client: OpenAI,
+                 client: AsyncOpenAI,
                  model: str = "gpt-4o-mini",
                  system_message: Optional[str] = None,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
@@ -41,7 +41,10 @@ class OpenAILLMService(BaseLLMModel):
     def tools(self):
         return self._tool_handler.tools
         
-    def model_generate(self, 
+    async def define_system_message(self) -> str:
+        return self._system_message
+        
+    async def model_generate(self, 
                        messages: List[Dict[str, str]],
                        tools: Optional[List[Dict[str, Any]]] = None,
                        response_schema: Optional[Any] = NOT_GIVEN) -> Union[OpenAgentResponse, BaseModel]:
@@ -52,7 +55,7 @@ class OpenAILLMService(BaseLLMModel):
 
         if response_schema:
             response = (
-                self._client.beta.chat.completions.parse(
+                await self._client.beta.chat.completions.parse(
                     model=self._model,
                     messages=messages,
                     tools=tools,
@@ -61,9 +64,7 @@ class OpenAILLMService(BaseLLMModel):
                     top_p=self._top_p,
                     response_format=response_schema,
                 )
-                .choices[0]
-                .message
-            )
+            ).choices[0].message
             
             if (response.refusal):
                 return OpenAgentResponse(**response.model_dump())
@@ -71,7 +72,7 @@ class OpenAILLMService(BaseLLMModel):
                 response = response.parsed
         else:
             response = (
-                self._client.chat.completions.create(
+                await self._client.chat.completions.create(
                     model=self._model,
                     messages=messages,
                     tools=tools,
@@ -79,9 +80,8 @@ class OpenAILLMService(BaseLLMModel):
                     max_tokens=self._max_tokens,
                     top_p=self._top_p,
                 )
-                .choices[0]
-                .message
-            )
+            ).choices[0].message
+            
             if (response.refusal):
                 return OpenAgentResponse(**response.model_dump())
             
@@ -96,14 +96,14 @@ class OpenAILLMService(BaseLLMModel):
         
         return response
         
-    def add_context(self, content: dict):
+    async def add_context(self, content: dict):
         self._context_history.append(content)
         return self._context_history
         
-    def extend_context(self, content: List[dict[str, str]]):
+    async def extend_context(self, content: List[dict[str, str]]):
         self._context_history.extend(content)
         return self._context_history
     
     # Delegate tool call handling to the tool handler
-    def _handle_tool_call(self, tool_name, **tool_args):
+    async def _handle_tool_call(self, tool_name, **tool_args):
         return self._tool_handler._handle_tool_call(tool_name, **tool_args)

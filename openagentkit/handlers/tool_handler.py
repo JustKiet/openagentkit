@@ -29,10 +29,14 @@ class ToolHandler:
         return logger.info(f"Binded {len(self._tools)} tools.")
     
     def _handle_tool_call(self, tool_name, **kwargs) -> BaseModel:
-        tool = self.tools_map.get(tool_name)
-        if not tool:
+        if self.tools_map is not NOT_GIVEN:
+            tool = self.tools_map.get(tool_name)
+            if not tool:
+                return None
+            return tool(**kwargs)
+        else:
+            logger.error("No tools provided")
             return None
-        return tool(**kwargs)
     
     def parse_tool_args(self, response: dict):
         tool_calls = None
