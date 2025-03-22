@@ -1,6 +1,6 @@
 import os
 from typing import Union
-from openagentkit.models import OpenAgentResponse
+from openagentkit.models.responses import OpenAgentResponse
 from openagentkit.handlers import ContextHandler, OutputHandler
 
 from openagentkit.interfaces import BaseExecutor

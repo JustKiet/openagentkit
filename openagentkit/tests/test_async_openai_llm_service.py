@@ -10,7 +10,7 @@ from typing import Dict, List, Optional
 
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
 from openagentkit.handlers.tool_handler import ToolHandler
-from openagentkit.models import OpenAgentResponse
+from openagentkit.models.responses import OpenAgentResponse
 
 
 class TestResponseSchema(BaseModel):

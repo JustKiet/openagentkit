@@ -1,11 +1,12 @@
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, Generator
 import os
 from loguru import logger
 from openai._types import NOT_GIVEN
 from openai import OpenAI
 from openagentkit.interfaces.base_executor import BaseExecutor
 from openagentkit.modules.openai import OpenAILLMService
-from openagentkit.models import OpenAgentResponse
+from openagentkit.models.responses import OpenAgentResponse, OpenAIStreamingResponse
+from openagentkit.models.tool_responses import ToolResultResponse
 from pydantic import BaseModel
 import json
 import datetime
@@ -22,7 +23,6 @@ class OpenAIExecutor(BaseExecutor):
                  top_p: Optional[float] = None,
                  *args,
                  **kwargs):
-        # Create an instance of OpenAILLMService instead of inheriting from it
         self._llm_service = OpenAILLMService(
             client=client,
             model=model,
@@ -33,41 +33,70 @@ class OpenAIExecutor(BaseExecutor):
             max_tokens=max_tokens,
             top_p=top_p,
         )
-        # Store configuration parameters
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._top_p = top_p
-        self._context_history = []
 
     def define_system_message(self, message: Optional[str] = None) -> str:
-        if message is not None:
-            self._system_message = message
-        else:
-            self._system_message = """
+        system_message = message if message is not None else """
             System Message: You are an helpful assistant, try to assist the user in everything.\n
             """
-        self._system_message += f"""
+        system_message += f"""
         Current date and time: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n
         
         """
-        return self._system_message
-
-    def extend_context(self, messages):
-        # Delegate to the LLM service
-        return self._llm_service.extend_context(messages)
+        return system_message
     
-    def add_context(self, message):
-        # Delegate to the LLM service
-        return self._llm_service.add_context(message)
-    
-    def _handle_tool_call(self, tool_name, **tool_args):
-        # Delegate to the LLM service
-        return self._llm_service._handle_tool_call(tool_name, **tool_args)
+    def _handle_tool_request(self, 
+                            response: OpenAgentResponse, 
+                            ) -> tuple[list, list]:
+        """
+        Handle tool requests and get the final response with tool results
+        """
+        assert type(response) == OpenAgentResponse or type(response) == OpenAIStreamingResponse, "Response must be an OpenAgentResponse or OpenAIStreamingResponse object"
+        tool_results = []
+        tool_messages = []
+        
+        # Check if the response contains tool calls
+        if response.tool_calls is None:
+            logger.debug("No tool calls found in the response. Skipping tool call handling.")
+            return tool_results, tool_messages
+        
+        # Handle tool calls 
+        for tool_call in response.tool_calls:
+            tool_call_id = tool_call.get("id")
+            tool_name = tool_call.get("function").get("name")
+            tool_args = eval(tool_call.get("function").get("arguments"))
+            notification = tool_args.get("_notification", None)
+            tool_args.pop("_notification", None)
+            tool_result = self._llm_service._handle_tool_call(tool_name, **tool_args)
+            
+            # Store tool call and result
+            tool_results.append({
+                "tool_call": tool_call,
+                "result": tool_result,
+            })
+            
+            logger.info(f"Tool Result: {tool_result}")
+            
+            # Convert tool result to string if it's not already a string
+            tool_result_str = str(tool_result)
+            
+            tool_message = {
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "content": tool_result_str,  # Use string representation
+            }
+            
+            tool_messages.append(tool_message)
+        
+        return tool_results, tool_messages, notification
 
     def execute(self, 
                 messages: List[Dict[str, str]],
                 tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
                 response_schema: Optional[BaseModel] = NOT_GIVEN,
+                verbose: bool = False,
                 **kwargs,
                ) -> Union[OpenAgentResponse, BaseModel]:
         kwargs.get("temperature", self._temperature)
@@ -77,56 +106,162 @@ class OpenAIExecutor(BaseExecutor):
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
         
-        context = self.extend_context(messages)
+        context = self._llm_service.extend_context(messages)
         
         logger.debug(f"Context: {context}")
         
+        # Take user initial request along with the chat history -> response
         response = self._llm_service.model_generate(
             messages=context, 
             tools=tools, 
             response_schema=response_schema
-        ).model_dump()
+        )
         
-        response = {
-            "role": "assistant",
-            "content": response,
-        } if response_schema else response
+        # Add the response to the context (chat history)
+        context = self._llm_service.add_context(response.model_dump())
         
-        context = self.add_context(response)
+        logger.info(f"Response Received: {response}")
+
+        tool_results = []
         
-        logger.info(f"Response Received: {response}" )
-        
-        if response.get("tool_calls", None) != None and type(response) == dict:
-            for tool_call in response.get("tool_calls"):
-                tool_call_id = tool_call.get("id")
-                tool_name = tool_call.get("function").get("name")
-                tool_args = eval(tool_call.get("function").get("arguments"))
-                tool_result = self._handle_tool_call(tool_name, **tool_args).model_dump()
-                
-                logger.info(f"Tool Result: {tool_result}")
-                
-                tool_message = {
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": json.dumps(tool_result),
-                }
-                
-                context = self.add_context(tool_message)
-                
-            response_with_tool_context = self._llm_service.model_generate(
-                messages=context, 
+        if response.tool_calls:
+            # Handle tool requests and get the final response with tool results
+            tool_results, tool_messages, notification = self._handle_tool_request(
+                response=response,
+            )
+
+            logger.debug(f"Tool Messages in Execute: {tool_messages}")
+
+            context = self._llm_service.extend_context(tool_messages)
+
+            logger.debug(f"Context: {context}")
+
+            # Generate the final response with the tool results
+            response = self._llm_service.model_generate(
+                messages=context,
                 tools=tools, 
                 response_schema=response_schema
-            ).model_dump()
-            
-            self.add_context(response_with_tool_context)
-            
-        final_response = self._llm_service._context_history[-1]
+            )
+
+        # Add the final response to the context (chat history)
+        self._llm_service.add_context(
+            {
+                "role": response.role,
+                "content": response.content,
+            }
+        )
         
-        logger.debug(f"Final Response: {final_response}")
+        logger.debug(f"Final Response: {response}")
         
+        # If there was a response schema, return the response schema
         if response_schema:
-            return response_schema(**final_response.get("content"))
+            return response_schema(
+                **response.get("content"),
+            )
         
-        if response:
-            return OpenAgentResponse(**final_response)
+        # If there is no response, return an error
+        if not response:
+            logger.error("No response from the model")
+            return OpenAgentResponse(
+                role="assistant",
+                content="",
+                tool_results=tool_results,
+                refusal="No response from the model",
+                audio=None,
+            )
+        
+        # Create a response that includes the assistant's content, tool calls, and results
+        response_data = {
+            "role": response.role,
+            "content": response.content,
+            "tool_results": tool_results,
+        }
+        
+        # Add tool calls if they exist
+        if hasattr(response, "tool_calls") and response.tool_calls:
+            response_data["tool_calls"] = response.tool_calls
+        
+        return OpenAgentResponse(**response_data)
+
+    def stream_execute(self, 
+                      messages: List[Dict[str, str]],
+                      tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
+                      response_schema: Optional[BaseModel] = NOT_GIVEN,
+                      **kwargs,
+                      ) -> Generator[OpenAIStreamingResponse, None, None]:
+        kwargs.get("temperature", self._temperature)
+        kwargs.get("max_tokens", self._max_tokens)
+        kwargs.get("top_p", self._top_p)
+        
+        if tools == NOT_GIVEN:
+            tools = self._llm_service.tools
+
+        context = self._llm_service.extend_context(messages)
+
+        logger.debug(f"Context: {context}")
+
+        response_generator = self._llm_service.model_stream(
+            messages=context,
+            tools=tools,
+            response_schema=response_schema,
+        )
+
+        final_response_generator = None
+        
+        for chunk in response_generator:
+            if chunk.finish_reason == "tool_calls":
+                # Add the llm tool call request to the context
+                context = self._llm_service.add_context(chunk.model_dump())
+
+                logger.debug(f"Context: {context}")
+
+                notification = chunk.tool_calls[0].get("function")
+                tool_notification = None
+
+                if notification.get("arguments"):
+                    if type(notification.get("arguments")) == str:
+                        args = json.loads(notification.get("arguments"))
+                    else:
+                        args = notification.get("arguments")
+
+                    if args.get("_notification"):
+                        tool_notification = args.get("_notification", None)
+
+                    if notification:
+                        logger.info(f"Tool Notification: {tool_notification}")
+                        yield OpenAIStreamingResponse(
+                            role="assistant",
+                            content="",
+                            tool_notification=tool_notification,
+                        )
+
+                # Handle the tool call request and get the final response with tool results
+                tool_results, tool_messages, notification = self._handle_tool_request(
+                    response=chunk,
+                )
+
+                context = self._llm_service.extend_context(tool_messages)
+
+                logger.debug(f"Tool Messages in Execute: {tool_messages}")
+                
+                logger.debug(f"Context in Stream Execute: {context}")
+                
+                final_response_generator = self._llm_service.model_stream(
+                    messages=context,
+                    tools=tools,
+                    response_schema=response_schema,
+                )
+
+                for final_chunk in final_response_generator:
+                    if final_chunk.content:
+                        context = self._llm_service.add_context({"role": "assistant", "content": final_chunk.content})
+                        logger.info(f"Context: {context}")
+                    yield final_chunk
+
+            elif chunk.finish_reason == "stop":
+                if chunk.content:
+                    context = self._llm_service.add_context({"role": "assistant", "content": chunk.content})
+                    logger.info(f"Context: {context}")
+                    yield chunk
+            else:
+                yield chunk

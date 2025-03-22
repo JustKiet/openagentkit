@@ -108,7 +108,7 @@ def get_type_metadata(annotation, description: Optional[str] = None) -> dict:
             "description": description,
         }
 
-def tool(description):
+def tool(description, _notification: bool = False, _notification_message: str = "The notification that you say to the user when you are executing this tool"):
     """
     A decorator that automatically generates a JSON schema for a function based on its type hints.
 
@@ -116,7 +116,8 @@ def tool(description):
 
     **Arguments**
         description: str - A description of the function. This description must be provided and be specific to the function so the LLM can understand the purpose of the function.
-    
+        _notification: bool - Whether to include a notification in the function schema.
+        _notification_message: str - The message to include in the notification.
     **Returns**
         A function that has a schema attribute that contains the JSON schema for the function.
 
@@ -142,6 +143,15 @@ def tool(description):
         signature = inspect.signature(func)
         properties = {}
         required = []
+        
+        if _notification is True:
+            properties = {
+                "_notification": {
+                    "type": "string",
+                    "description": _notification_message
+                }
+            }
+            required.append("_notification")
 
         for name, param in signature.parameters.items():
             annotation = param.annotation

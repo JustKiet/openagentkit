@@ -53,3 +53,4 @@ class ToolHandler:
                 for tc in response.tool_calls
             ]
         return tool_calls
+    

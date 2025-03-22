@@ -9,7 +9,7 @@ from typing import Dict, List, Optional
 
 from openagentkit.modules.openai.openai_executor import OpenAIExecutor
 from openagentkit.modules.openai import OpenAILLMService
-from openagentkit.models import OpenAgentResponse
+from openagentkit.models.responses import OpenAgentResponse
 
 
 class TestResponseSchema(BaseModel):

@@ -158,11 +158,12 @@ def extract_forecast(weather_data: dict) -> list:
 
 @tool(
     description="Get the weather forecast for a location. If no location is provided, the location will automatically be determined using the IP address.",
+    _notification=True,
 )
 def get_weather_tool(
     mode: Annotated[Literal["current", "forecast", "both"], "Weather Response mode."],
     location: Annotated[Union[str, Literal["Unknown"]], "The location to get the weather forecast for."], 
-    days: Annotated[Union[int, Literal[0]], "The number of days to get the weather forecast for. Maximum of 3"] = 3,
+    days: Annotated[Union[int, Literal[0]], "The number of days to get the weather forecast for. Maximum of 3"],
     ) -> WeatherResponse:
     """
     Get weather information for a location.

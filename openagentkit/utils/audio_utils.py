@@ -5,7 +5,6 @@ from typing import Literal
 import struct
 
 class AudioUtility:
-    
     @staticmethod
     def detect_audio_format(audio_bytes: bytes) -> Literal["wav", "webm", "mp3", "ogg", "flac", "aac", "aiff", "mpeg", "mpga", "m4a", "pcm", "unknown"]:
         """
