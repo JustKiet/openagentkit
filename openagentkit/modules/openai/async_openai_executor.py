@@ -6,7 +6,7 @@ from openai import AsyncOpenAI
 from openagentkit.interfaces.async_base_executor import AsyncBaseExecutor
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
 from openagentkit.models.responses import OpenAgentResponse, OpenAIStreamingResponse
-from openagentkit.models.tool_responses import ToolResultResponse
+from openagentkit.handlers.tool_handler import ToolHandler
 from pydantic import BaseModel
 import json
 import datetime
@@ -36,7 +36,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         self._temperature = temperature
         self._max_tokens = max_tokens
         self._top_p = top_p
-
+        self._tool_handler = ToolHandler(tools=tools)
     def define_system_message(self, message: Optional[str] = None) -> str:
         system_message = message if message is not None else """
             System Message: You are an helpful assistant, try to assist the user in everything.\n
@@ -47,49 +47,6 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         """
         return system_message
     
-    async def _handle_tool_request(self, response: OpenAgentResponse) -> tuple[list, list]:
-        """
-        Handle tool requests and get the final response with tool results
-        """
-        assert type(response) == OpenAgentResponse or type(response) == OpenAIStreamingResponse, "Response must be an OpenAgentResponse or OpenAIStreamingResponse object"
-        tool_results = []
-        tool_messages = []
-        
-        # Check if the response contains tool calls
-        if response.tool_calls is None:
-            logger.debug("No tool calls found in the response. Skipping tool call handling.")
-            return tool_results, tool_messages
-
-        # Handle tool calls 
-        for tool_call in response.tool_calls:
-            tool_call_id = tool_call.get("id")
-            tool_name = tool_call.get("function").get("name")
-            tool_args = eval(tool_call.get("function").get("arguments"))
-            # Save notification value and remove _notification key from tool args if present
-            notification = tool_args.get("_notification", None)
-            tool_args.pop("_notification", None)
-            tool_result = await self._llm_service._handle_tool_call(tool_name, **tool_args)
-            
-            # Store tool call and result
-            tool_results.append({
-                "tool_call": tool_call,
-                "result": tool_result,
-            })
-            
-            logger.info(f"Tool Result: {tool_result}")
-            
-            # Convert tool result to string if it's not already a string
-            tool_result_str = str(tool_result)
-            
-            tool_message = {
-                "role": "tool",
-                "tool_call_id": tool_call_id,
-                "content": tool_result_str,  # Use string representation
-            }
-
-            tool_messages.append(tool_message)
-        
-        return tool_results, tool_messages, notification
 
     async def execute(self, 
                 messages: List[Dict[str, str]],
@@ -125,13 +82,13 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         
         if response.tool_calls:
             # Handle tool requests abd get the final response with tool results
-            tool_results, tool_messages, notification = await self._handle_tool_request(
+            tool_response = self._tool_handler.handle_tool_request(
                 response=response,
             )
 
-            logger.debug(f"Tool Messages in Execute: {tool_messages}")
+            logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
 
-            context = await self._llm_service.extend_context(tool_messages)
+            context = await self._llm_service.extend_context(tool_response.tool_messages)
 
             logger.debug(f"Context: {context}")
 
@@ -235,13 +192,13 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                         )
 
                 # Handle the tool call request and get the final response with tool results
-                _, tool_messages, _ = await self._handle_tool_request(
+                tool_response = self._tool_handler.handle_tool_request(
                     response=chunk,
                 ) 
 
-                context = await self._llm_service.extend_context(tool_messages)
+                context = await self._llm_service.extend_context(tool_response.tool_messages)
 
-                logger.debug(f"Tool Messages in Execute: {tool_messages}")
+                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
                 
                 logger.debug(f"Context in Stream Execute: {context}")
                 

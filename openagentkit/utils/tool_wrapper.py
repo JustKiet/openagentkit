@@ -108,7 +108,10 @@ def get_type_metadata(annotation, description: Optional[str] = None) -> dict:
             "description": description,
         }
 
-def tool(description, _notification: bool = False, _notification_message: str = "The notification that you say to the user when you are executing this tool"):
+def tool(
+        description: str, 
+        _notification: bool = False,
+        _notification_message: str = "The notification that you say to the user when you are executing this tool. If you execute multiple tools, you must include all the tool names in the notification too."):
     """
     A decorator that automatically generates a JSON schema for a function based on its type hints.
 

@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class ToolCallFunction(BaseModel):
     name: str
@@ -9,6 +10,9 @@ class ToolCallResponse(BaseModel):
     type: str
     function: ToolCallFunction
 
-class ToolResultResponse(BaseModel):
-    tool_call: ToolCallResponse
-    result: dict
+class ToolResponse(BaseModel):
+    tool_args: Optional[list[dict]] = None
+    tool_calls: Optional[list[dict]] = None
+    tool_results: Optional[list[dict]] = None
+    tool_messages: Optional[list[dict]] = None
+    tool_notifications: Optional[list[str]] = None
