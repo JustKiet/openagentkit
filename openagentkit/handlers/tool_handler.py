@@ -1,4 +1,4 @@
-from typing import List, Optional, Callable, Any
+from typing import List, Optional, Callable, Any, Union
 from loguru import logger
 from openai._types import NOT_GIVEN
 import json
@@ -56,6 +56,32 @@ class ToolHandler:
             ]
         return tool_calls
     
+    def handle_notification(self, chunk: OpenAIStreamingResponse) -> Union[OpenAIStreamingResponse, None]:
+        """
+        Handle the notification from the tool call chunk
+        """
+        notification = chunk.tool_calls[0].get("function")
+        tool_notification = None
+        
+        if notification.get("arguments"):
+            if type(notification.get("arguments")) == str:
+                args = json.loads(notification.get("arguments"))
+            else:
+                args = notification.get("arguments")
+
+            if args.get("_notification"):
+                tool_notification = args.get("_notification", None)
+
+            if notification:
+                logger.info(f"Tool Notification: {tool_notification}")
+                return OpenAIStreamingResponse(
+                    role="assistant",
+                    content="",
+                    tool_notification=tool_notification,
+                )
+            
+        return None
+
     def handle_tool_request(self, response: OpenAgentResponse) -> ToolResponse:
         """
         Handle tool requests and get the final response with tool results
@@ -70,7 +96,13 @@ class ToolHandler:
         # Check if the response contains tool calls
         if response.tool_calls is None:
             logger.debug("No tool calls found in the response. Skipping tool call handling.")
-            return tool_results_list, tool_messages_list
+            return ToolResponse(
+                tool_args=[],
+                tool_calls=[],
+                tool_results=[],
+                tool_messages=[],
+                tool_notifications=[]
+            )
 
         # Handle tool calls 
         for tool_call in response.tool_calls:

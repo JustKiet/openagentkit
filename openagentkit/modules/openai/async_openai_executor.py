@@ -37,6 +37,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         self._max_tokens = max_tokens
         self._top_p = top_p
         self._tool_handler = ToolHandler(tools=tools)
+
     def define_system_message(self, message: Optional[str] = None) -> str:
         system_message = message if message is not None else """
             System Message: You are an helpful assistant, try to assist the user in everything.\n
@@ -46,7 +47,6 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         
         """
         return system_message
-    
 
     async def execute(self, 
                 messages: List[Dict[str, str]],
@@ -171,25 +171,11 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                 logger.debug(f"Context: {context}")
 
-                notification = chunk.tool_calls[0].get("function")
-                tool_notification = None
+                # Handle the notification (if any) from the tool call chunk
+                notification = self._tool_handler.handle_notification(chunk)
 
-                if notification.get("arguments"):
-                    if type(notification.get("arguments")) == str:
-                        args = json.loads(notification.get("arguments"))
-                    else:
-                        args = notification.get("arguments")
-
-                    if args.get("_notification"):
-                        tool_notification = args.get("_notification", None)
-
-                    if notification:
-                        logger.info(f"Tool Notification: {tool_notification}")
-                        yield OpenAIStreamingResponse(
-                            role="assistant",
-                            content="",
-                            tool_notification=tool_notification,
-                        )
+                if notification:
+                    yield notification
 
                 # Handle the tool call request and get the final response with tool results
                 tool_response = self._tool_handler.handle_tool_request(
