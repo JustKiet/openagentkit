@@ -8,7 +8,6 @@ class OpenAgentResponse(BaseModel):
     content: Optional[Union[str, BaseModel, dict]] = None
     tool_calls: Optional[List[Union[Dict[str, Any], BaseModel]]] = None
     tool_results: Optional[List[Union[Dict[str, Any], BaseModel]]] = None
-    tool_notification: Optional[str] = None
     refusal: Optional[str] = None
     audio: Optional[Union[str, bytes]] = None
     usage: Optional[UsageResponse] = None

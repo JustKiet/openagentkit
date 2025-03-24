@@ -73,14 +73,28 @@ class OpenAIExecutor(BaseExecutor):
             response_schema=response_schema
         )
         
-        # Add the response to the context (chat history)
-        context = self._llm_service.add_context(response.model_dump())
+        if response.content is not None:
+            # Add the response to the context (chat history)
+            context = self._llm_service.add_context(
+                {
+                    "role": response.role,
+                    "content": str(response.content),
+                }
+            )
         
         logger.info(f"Response Received: {response}")
 
         tool_results = []
         
         if response.tool_calls:
+            # Add the tool call request to the context
+            context = self._llm_service.add_context(
+                {
+                    "role": response.role,
+                    "tool_calls": response.tool_calls,
+                    "content": str(response.content),
+                }
+            )
             # Handle tool requests and get the final response with tool results
             tool_response = self._tool_handler.handle_tool_request(
                 response=response,
@@ -103,17 +117,11 @@ class OpenAIExecutor(BaseExecutor):
         self._llm_service.add_context(
             {
                 "role": response.role,
-                "content": response.content,
+                "content": str(response.content),
             }
         )
         
         logger.debug(f"Final Response: {response}")
-        
-        # If there was a response schema, return the response schema
-        if response_schema:
-            return response_schema(
-                **response.get("content"),
-            )
         
         # If there is no response, return an error
         if not response:
@@ -126,18 +134,15 @@ class OpenAIExecutor(BaseExecutor):
                 audio=None,
             )
         
-        # Create a response that includes the assistant's content, tool calls, and results
-        response_data = {
-            "role": response.role,
-            "content": response.content,
-            "tool_results": tool_results,
-        }
-        
-        # Add tool calls if they exist
-        if hasattr(response, "tool_calls") and response.tool_calls:
-            response_data["tool_calls"] = response.tool_calls
-        
-        return OpenAgentResponse(**response_data)
+        return OpenAgentResponse(
+            role=response.role,
+            content=str(response.content),
+            tool_calls=response.tool_calls,
+            tool_results=tool_results,
+            refusal=response.refusal,
+            audio=response.audio,
+            usage=response.usage,
+        )
 
     def stream_execute(self, 
                       messages: List[Dict[str, str]],
@@ -167,7 +172,13 @@ class OpenAIExecutor(BaseExecutor):
         for chunk in response_generator:
             if chunk.finish_reason == "tool_calls":
                 # Add the llm tool call request to the context
-                context = self._llm_service.add_context(chunk.model_dump())
+                context = self._llm_service.add_context(
+                    {
+                        "role": "assistant",
+                        "tool_calls": chunk.tool_calls,
+                        "content": str(chunk.content),
+                    }
+                )
 
                 logger.debug(f"Context: {context}")
 
@@ -180,10 +191,10 @@ class OpenAIExecutor(BaseExecutor):
                 tool_response = self._tool_handler.handle_tool_request(
                     response=chunk,
                 )
+                
+                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
 
                 context = self._llm_service.extend_context(tool_response.tool_messages)
-
-                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
                 
                 logger.debug(f"Context in Stream Execute: {context}")
                 
@@ -193,15 +204,25 @@ class OpenAIExecutor(BaseExecutor):
                     response_schema=response_schema,
                 )
 
-                for final_chunk in final_response_generator:
-                    if final_chunk.content:
-                        context = self._llm_service.add_context({"role": "assistant", "content": final_chunk.content})
+                for chunk in final_response_generator:
+                    if chunk.content:
+                        context = self._llm_service.add_context(
+                            {
+                                "role": "assistant", 
+                                "content": chunk.content
+                            }
+                        )
                         logger.info(f"Context: {context}")
-                    yield final_chunk
+                    yield chunk
 
             elif chunk.finish_reason == "stop":
                 if chunk.content:
-                    context = self._llm_service.add_context({"role": "assistant", "content": chunk.content})
+                    context = self._llm_service.add_context(
+                        {
+                            "role": "assistant", 
+                            "content": chunk.content
+                        }
+                    )
                     logger.info(f"Context: {context}")
                     yield chunk
             else:

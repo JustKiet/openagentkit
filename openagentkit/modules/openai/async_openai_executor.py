@@ -12,6 +12,31 @@ import json
 import datetime
 
 class AsyncOpenAIExecutor(AsyncBaseExecutor):
+    """
+    An asynchronous executor (agentic) module for OpenAI models.
+
+    Args:
+        client (AsyncOpenAI): The AsyncOpenAI client.
+        model (str): The model to use. (default: "gpt-4o-mini")
+        system_message (Optional[str]): The system message to use. (default: None)
+        tools (Optional[List[Callable[..., Any]]]): The tools to use. (default: NOT_GIVEN)
+        api_key (Optional[str]): The API key to use. (default: os.getenv("OPENAI_API_KEY"))
+        temperature (Optional[float]): The temperature to use. (default: 0.3)
+        max_tokens (Optional[int]): The maximum number of tokens to use. (default: None)
+        top_p (Optional[float]): The top p to use. (default: None)
+
+    Example:
+    ```python
+    from openagentkit.modules.openai import AsyncOpenAIExecutor
+    from openagentkit.tools import duckduckgo_search_tool
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    executor = AsyncOpenAIExecutor(client=client, tools=[duckduckgo_search_tool])
+    response = await executor.execute(messages=[{"role": "user", "content": "What is Quantum Mechanics?"}])
+    ```
+
+    """
     def __init__(self,
                  client: AsyncOpenAI,
                  model: str = "gpt-4o-mini",
@@ -39,6 +64,15 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         self._tool_handler = ToolHandler(tools=tools)
 
     def define_system_message(self, message: Optional[str] = None) -> str:
+        """
+        Define the system message for the OpenAI model.
+
+        Args:
+            message (Optional[str]): The system message to use. (default: None)
+
+        Returns:
+            str: The system message.
+        """
         system_message = message if message is not None else """
             System Message: You are an helpful assistant, try to assist the user in everything.\n
             """
@@ -49,12 +83,23 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         return system_message
 
     async def execute(self, 
-                messages: List[Dict[str, str]],
-                tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
-                response_schema: Optional[BaseModel] = NOT_GIVEN,
-                verbose: bool = False,
-                **kwargs,
-               ) -> Union[OpenAgentResponse, BaseModel, AsyncGenerator[Dict[str, Any], None]]:
+                      messages: List[Dict[str, str]],
+                      tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
+                      response_schema: Optional[BaseModel] = NOT_GIVEN,
+                      **kwargs,
+                    ) -> OpenAgentResponse:
+        """
+        Asynchronously execute the OpenAI model and return an OpenAgentResponse object.
+
+        Args:
+            messages (List[Dict[str, str]]): The messages to send to the model.
+            tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
+            response_schema (Optional[BaseModel]): The schema to use in the response.
+            verbose (bool): Whether to print the response. (default: False)
+
+        Returns:
+            An OpenAgentResponse object.
+        """
         kwargs.get("temperature", self._temperature)
         kwargs.get("max_tokens", self._max_tokens)
         kwargs.get("top_p", self._top_p)
@@ -72,15 +117,28 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             tools=tools, 
             response_schema=response_schema
         )
-        
-        # Add the response to the context (chat history)
-        context = await self._llm_service.add_context(response.model_dump())
-        
+
+        if response.content is not None:
+            context = await self._llm_service.add_context(
+                {
+                    "role": response.role,
+                    "content": str(response.content),
+                }
+            )
+
         logger.info(f"Response Received: {response}")
 
         tool_results = []
         
         if response.tool_calls:
+            # Add the tool call request to the context
+            context = await self._llm_service.add_context(
+                {
+                    "role": response.role,
+                    "tool_calls": response.tool_calls,
+                    "content": str(response.content),
+                }
+            )
             # Handle tool requests abd get the final response with tool results
             tool_response = self._tool_handler.handle_tool_request(
                 response=response,
@@ -103,17 +161,11 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         await self._llm_service.add_context(
             {
                 "role": response.role,
-                "content": response.content,
+                "content": str(response.content),
             }
         )
         
         logger.debug(f"Final Response: {response}")
-        
-        # If there was a response schema, return the response schema
-        if response_schema:
-            return response_schema(
-                **response.get("content"),
-            )
         
         # If there is no response, return an error
         if not response:
@@ -126,18 +178,15 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                 audio=None,
             )
         
-        # Create a response that includes the assistant's content, tool calls, and results
-        response_data = {
-            "role": response.role,
-            "content": response.content,
-            "tool_results": tool_results,
-        }
-        
-        # Add tool calls if they exist
-        if "tool_calls" in response:
-            response_data["tool_calls"] = response.get("tool_calls")
-        
-        return OpenAgentResponse(**response_data)
+        return OpenAgentResponse(
+            role=response.role,
+            content=str(response.content),
+            tool_calls=response.tool_calls,
+            tool_results=tool_results,
+            refusal=response.refusal,
+            audio=response.audio,
+            usage=response.usage,
+        )
 
     async def stream_execute(self, 
                              messages: List[Dict[str, str]],
@@ -167,7 +216,13 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         async for chunk in response_generator:
             if chunk.finish_reason == "tool_calls":
                 # Add the llm tool call request to the context
-                context = await self._llm_service.add_context(chunk.model_dump())
+                context = await self._llm_service.add_context(
+                    {
+                        "role": "assistant",
+                        "tool_calls": chunk.tool_calls,
+                        "content": str(chunk.content),
+                    }
+                )
 
                 logger.debug(f"Context: {context}")
 
@@ -180,11 +235,11 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                 # Handle the tool call request and get the final response with tool results
                 tool_response = self._tool_handler.handle_tool_request(
                     response=chunk,
-                ) 
-
-                context = await self._llm_service.extend_context(tool_response.tool_messages)
+                )
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
+
+                context = await self._llm_service.extend_context(tool_response.tool_messages)
                 
                 logger.debug(f"Context in Stream Execute: {context}")
                 
@@ -196,13 +251,23 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                 async for chunk in final_response_generator:
                     if chunk.content:
-                        context = await self._llm_service.add_context({"role": "assistant", "content": chunk.content})
+                        context = await self._llm_service.add_context(
+                            {
+                                "role": "assistant",
+                                "content": str(chunk.content),
+                            }
+                        )
                         logger.info(f"Context: {context}")
                     yield chunk
 
             elif chunk.finish_reason == "stop":
                 if chunk.content:
-                    context = await self._llm_service.add_context({"role": "assistant", "content": chunk.content})
+                    context = await self._llm_service.add_context(
+                        {
+                            "role": "assistant",
+                            "content": str(chunk.content),
+                        }
+                    )
                     logger.info(f"Context: {context}")
                     yield chunk
             else:

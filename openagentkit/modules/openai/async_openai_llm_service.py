@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 from openai import AsyncOpenAI
-from openai._types import NOT_GIVEN
+from openai._types import NOT_GIVEN, NotGiven
 from pydantic import BaseModel
 from openagentkit.handlers.tool_handler import ToolHandler
 from openagentkit.interfaces import AsyncBaseLLMModel
@@ -55,11 +55,12 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
     async def _handle_client_request(self,
                                      messages: List[Dict[str, str]],
                                      tools: Optional[List[Dict[str, Any]]],
-                                     response_schema: BaseModel = NOT_GIVEN,
+                                     response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN,
                                      ) -> OpenAgentResponse:
+        if tools is None:
+            tools = self.tools
 
-
-        if response_schema is NOT_GIVEN:
+        if response_schema is NOT_GIVEN or isinstance(response_schema, NotGiven):
             # Handle the client request without response schema
             client_response = await self._client.chat.completions.create(
                     model=self._model,
@@ -126,12 +127,12 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
     async def _handle_client_stream(self,
                                     messages: List[Dict[str, str]],
                                     tools: Optional[List[Dict[str, Any]]] = None,
-                                    response_schema: BaseModel = NOT_GIVEN) -> AsyncGenerator[OpenAIStreamingResponse, None]:
+                                    response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN) -> AsyncGenerator[OpenAIStreamingResponse, None]:
         
         if tools is None:
             tools = self.tools
         
-        if response_schema is NOT_GIVEN:
+        if response_schema is NOT_GIVEN or isinstance(response_schema, NotGiven):
             client_stream = await self._client.chat.completions.create(
                 model=self._model,
                 messages=messages,
@@ -223,8 +224,8 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
 
     async def model_stream(self,
                            messages: List[Dict[str, str]],
-                           tools: List[Dict[str, Any]] = None,
-                           response_schema: BaseModel = NOT_GIVEN) -> AsyncGenerator[OpenAIStreamingResponse, None]:
+                           tools: Optional[List[Dict[str, Any]]] = None,
+                           response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN) -> AsyncGenerator[OpenAIStreamingResponse, None]:
         if tools is None:
             tools = self.tools
 
@@ -242,7 +243,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
     async def model_generate(self, 
                        messages: List[Dict[str, str]],
                        tools: Optional[List[Dict[str, Any]]] = None,
-                       response_schema: Optional[BaseModel] = NOT_GIVEN) -> OpenAgentResponse:
+                       response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN) -> OpenAgentResponse:
         """
         Generate a response from the model.
         
