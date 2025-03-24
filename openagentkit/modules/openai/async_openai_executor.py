@@ -63,6 +63,9 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         self._top_p = top_p
         self._tool_handler = ToolHandler(tools=tools)
 
+    def get_history(self) -> List[Dict[str, Any]]:
+        return self._llm_service.history
+
     def define_system_message(self, message: Optional[str] = None) -> str:
         """
         Define the system message for the OpenAI model.
@@ -111,51 +114,51 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         
         logger.debug(f"Context: {context}")
         
-        # Take user intial request along with the chat history -> response
-        response = await self._llm_service.model_generate(
-            messages=context, 
-            tools=tools, 
-            response_schema=response_schema
-        )
-
-        if response.content is not None:
-            context = await self._llm_service.add_context(
-                {
-                    "role": response.role,
-                    "content": str(response.content),
-                }
-            )
-
-        logger.info(f"Response Received: {response}")
-
-        tool_results = []
+        stop = False
         
-        if response.tool_calls:
-            # Add the tool call request to the context
-            context = await self._llm_service.add_context(
-                {
-                    "role": response.role,
-                    "tool_calls": response.tool_calls,
-                    "content": str(response.content),
-                }
-            )
-            # Handle tool requests abd get the final response with tool results
-            tool_response = self._tool_handler.handle_tool_request(
-                response=response,
-            )
-
-            logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
-
-            context = await self._llm_service.extend_context(tool_response.tool_messages)
-
-            logger.debug(f"Context: {context}")
-
-            # Generate the final response with the tool results
+        while not stop:
+            # Take user intial request along with the chat history -> response
             response = await self._llm_service.model_generate(
-                messages=context,
+                messages=context, 
                 tools=tools, 
                 response_schema=response_schema
             )
+
+            logger.info(f"Response Received: {response}")
+
+            if response.content is not None:
+                # Add the response to the context (chat history)
+                context = await self._llm_service.add_context(
+                    {
+                        "role": response.role,
+                        "content": str(response.content),
+                    }
+                )
+
+            tool_results = []
+            
+            if response.tool_calls:
+                # Add the tool call request to the context
+                context = await self._llm_service.add_context(
+                    {
+                        "role": response.role,
+                        "tool_calls": response.tool_calls,
+                        "content": str(response.content),
+                    }
+                )
+                # Handle tool requests abd get the final response with tool results
+                tool_response = self._tool_handler.handle_tool_request(
+                    response=response,
+                )
+
+                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
+
+                context = await self._llm_service.extend_context(tool_response.tool_messages)
+
+                logger.debug(f"Context: {context}")
+            
+            else:
+                stop = True
 
         # Add the final response to the context (chat history)
         await self._llm_service.add_context(
@@ -201,55 +204,52 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
 
+        stop = False
+
         context = await self._llm_service.extend_context(messages)
 
-        logger.debug(f"Context: {context}")
+        while not stop: 
 
-        response_generator = self._llm_service.model_stream(
-            messages=context,
-            tools=tools,
-            response_schema=response_schema,
-        )
+            logger.debug(f"Context: {context}")
 
-        final_response_generator = None
-        
-        async for chunk in response_generator:
-            if chunk.finish_reason == "tool_calls":
-                # Add the llm tool call request to the context
-                context = await self._llm_service.add_context(
-                    {
-                        "role": "assistant",
-                        "tool_calls": chunk.tool_calls,
-                        "content": str(chunk.content),
-                    }
-                )
+            response_generator = self._llm_service.model_stream(
+                messages=context,
+                tools=tools,
+                response_schema=response_schema,
+            )
+            
+            async for chunk in response_generator:
+                if chunk.finish_reason == "tool_calls":
+                    # Add the llm tool call request to the context
+                    context = await self._llm_service.add_context(
+                        {
+                            "role": "assistant",
+                            "tool_calls": chunk.tool_calls,
+                            "content": str(chunk.content),
+                        }
+                    )
 
-                logger.debug(f"Context: {context}")
+                    logger.debug(f"Context: {context}")
 
-                # Handle the notification (if any) from the tool call chunk
-                notification = self._tool_handler.handle_notification(chunk)
+                    # Handle the notification (if any) from the tool call chunk
+                    notification = self._tool_handler.handle_notification(chunk)
 
-                if notification:
-                    yield notification
+                    # If there is a tool call notification but NO CONTENT, yield the notification
+                    if notification and not chunk.content:
+                        yield notification
 
-                # Handle the tool call request and get the final response with tool results
-                tool_response = self._tool_handler.handle_tool_request(
-                    response=chunk,
-                )
+                    # Handle the tool call request and get the final response with tool results
+                    tool_response = self._tool_handler.handle_tool_request(
+                        response=chunk,
+                    )
 
-                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
+                    logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
 
-                context = await self._llm_service.extend_context(tool_response.tool_messages)
-                
-                logger.debug(f"Context in Stream Execute: {context}")
-                
-                final_response_generator = self._llm_service.model_stream(
-                    messages=context,
-                    tools=tools,
-                    response_schema=response_schema,
-                )
+                    context = await self._llm_service.extend_context(tool_response.tool_messages)
+                    
+                    logger.debug(f"Context in Stream Execute: {context}")
 
-                async for chunk in final_response_generator:
+                elif chunk.finish_reason == "stop":
                     if chunk.content:
                         context = await self._llm_service.add_context(
                             {
@@ -258,17 +258,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                             }
                         )
                         logger.info(f"Context: {context}")
+                        yield chunk
+                        stop = True
+                else:
                     yield chunk
-
-            elif chunk.finish_reason == "stop":
-                if chunk.content:
-                    context = await self._llm_service.add_context(
-                        {
-                            "role": "assistant",
-                            "content": str(chunk.content),
-                        }
-                    )
-                    logger.info(f"Context: {context}")
-                    yield chunk
-            else:
-                yield chunk

@@ -36,6 +36,10 @@ class OpenAILLMService(BaseLLMModel):
             }
         ]
     
+    @property
+    def history(self) -> List[Dict[str, Any]]:
+        return self._context_history
+    
     # Property to access tools from the tool handler
     @property
     def tools(self):

@@ -44,6 +44,10 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             }
         ]
     
+    @property
+    def history(self):
+        return self._context_history
+    
     # Property to access tools from the tool handler
     @property
     def tools(self):
@@ -57,8 +61,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                                      tools: Optional[List[Dict[str, Any]]],
                                      response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN,
                                      ) -> OpenAgentResponse:
-        if tools is None:
-            tools = self.tools
+
 
         if response_schema is NOT_GIVEN or isinstance(response_schema, NotGiven):
             # Handle the client request without response schema
