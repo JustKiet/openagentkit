@@ -16,19 +16,25 @@ class AudioUtility:
         if len(audio_bytes) < 12:
             logger.warning("Audio data too short to determine format")
             return "unknown"
+        
+        # Enhanced WebM detection (common format from browser recording)
+        # WebM signature varies - look for EBML header or matroska markers
+        if (audio_bytes.startswith(b'\x1A\x45\xDF\xA3') or  # Primary WebM signature
+            b'\x42\x82\x84webm' in audio_bytes[:50] or      # Look for 'webm' marker
+            b'\x1A\x45\xDF\xA3\x01\x00\x00\x00' in audio_bytes[:50]):  # Alternative signature
+            logger.info("Detected WebM format (enhanced detection)")
+            return "webm"
             
         # Check for WAV (RIFF header)
         if audio_bytes.startswith(b'RIFF') and b'WAVE' in audio_bytes[0:12]:
             logger.info("Detected WAV format")
             return "wav"
             
-        # Check for WebM
-        if audio_bytes.startswith(b'\x1a\x45\xdf\xa3'):
-            logger.info("Detected WebM format")
-            return "webm"
-            
         # Check for MP3
-        if audio_bytes.startswith(b'\xFF\xFB') or audio_bytes.startswith(b'\x49\x44\x33'):
+        if (audio_bytes.startswith(b'\xFF\xFB') or 
+            audio_bytes.startswith(b'\xFF\xF3') or 
+            audio_bytes.startswith(b'\xFF\xF2') or 
+            audio_bytes.startswith(b'\x49\x44\x33')):  # ID3 tag
             logger.info("Detected MP3 format")
             return "mp3"
             
@@ -43,7 +49,9 @@ class AudioUtility:
             return "flac"
             
         # Check for AAC
-        if audio_bytes.startswith(b'\xFF\xF1') or audio_bytes.startswith(b'\xFF\xF9'):
+        if (audio_bytes.startswith(b'\xFF\xF1') or 
+            audio_bytes.startswith(b'\xFF\xF9') or
+            b'ftypM4A' in audio_bytes[:20]):  # M4A container with AAC
             logger.info("Detected AAC format")
             return "aac"
             
@@ -53,13 +61,15 @@ class AudioUtility:
             return "aiff"
             
         # Check for M4A (MPEG-4 Audio)
-        if audio_bytes.startswith(b'\x00\x00\x00\x20\x66\x74\x79\x70\x4D\x34\x41') or \
-           audio_bytes.startswith(b'\x00\x00\x00\x18\x66\x74\x79\x70\x6D\x70\x34\x32'):
+        if (audio_bytes.startswith(b'\x00\x00\x00\x20\x66\x74\x79\x70\x4D\x34\x41') or 
+            audio_bytes.startswith(b'\x00\x00\x00\x18\x66\x74\x79\x70\x6D\x70\x34\x32') or
+            b'ftypM4A' in audio_bytes[:20]):
             logger.info("Detected M4A format")
             return "m4a"
             
         # Check for MPEG
-        if audio_bytes.startswith(b'\x00\x00\x01\xBA') or audio_bytes.startswith(b'\x00\x00\x01\xB3'):
+        if (audio_bytes.startswith(b'\x00\x00\x01\xBA') or 
+            audio_bytes.startswith(b'\x00\x00\x01\xB3')):
             logger.info("Detected MPEG format")
             return "mpeg"
             
@@ -68,6 +78,16 @@ class AudioUtility:
             logger.info("Detected MPGA format")
             return "mpga"
         
+        # Browser-recorded blob may have custom formats or headers
+        # Look for common browser-specific markers
+        if b'audio/webm' in audio_bytes[:1000]:
+            logger.info("Detected WebM format (browser metadata)")
+            return "webm"
+            
+        if b'audio/wav' in audio_bytes[:1000] or b'audio/x-wav' in audio_bytes[:1000]:
+            logger.info("Detected WAV format (browser metadata)")
+            return "wav"
+            
         # If no known signatures match, try to determine if it's raw PCM
         try:
             # Check if data looks like 16-bit PCM (reasonable amplitude values)
@@ -87,6 +107,13 @@ class AudioUtility:
         except Exception as e:
             logger.error(f"Error checking for PCM: {e}")
         
+        # Dump initial bytes for debugging unknown formats
+        try:
+            hex_dump = ' '.join([f'{b:02x}' for b in audio_bytes[:32]])
+            logger.warning(f"Unknown format - first 32 bytes: {hex_dump}")
+        except Exception as e:
+            logger.error(f"Error creating hex dump: {e}")
+            
         logger.warning("Unknown audio format")
         return "unknown"
     
@@ -126,6 +153,11 @@ class AudioUtility:
         # Log the size of incoming data
         logger.info(f"Converting {len(raw_audio_bytes)} bytes of raw audio data to WAV")
         
+        # Check if input might already be a WAV file
+        if len(raw_audio_bytes) > 44 and raw_audio_bytes.startswith(b'RIFF') and b'WAVE' in raw_audio_bytes[:12]:
+            logger.info("Input appears to be already in WAV format, returning as is")
+            return io.BytesIO(raw_audio_bytes)
+            
         # Create a new WAV file in memory
         wav_file = io.BytesIO()
         
@@ -155,3 +187,63 @@ class AudioUtility:
                 wf.writeframes(b'')  # Empty audio
             empty_wav.seek(0)
             return empty_wav
+            
+    @staticmethod
+    def convert_audio_format(audio_bytes: bytes, source_format: str, target_format: str = "wav") -> bytes:
+        """
+        Convert audio from one format to another using FFmpeg.
+        
+        :param audio_bytes: Input audio data in bytes
+        :param source_format: Source format (e.g., 'webm', 'mp3')
+        :param target_format: Target format (e.g., 'wav', 'mp3')
+        :return: Converted audio data in bytes
+        """
+        try:
+            import tempfile
+            import subprocess
+            import os
+            
+            # Create temp files for input and output
+            with tempfile.NamedTemporaryFile(suffix=f'.{source_format}', delete=False) as in_file:
+                in_file.write(audio_bytes)
+                in_path = in_file.name
+                
+            out_path = in_path.replace(f'.{source_format}', f'.{target_format}')
+            
+            # Run FFmpeg conversion
+            logger.info(f"Converting {source_format} to {target_format} using FFmpeg")
+            command = [
+                'ffmpeg',
+                '-y',  # Overwrite output files
+                '-i', in_path,  # Input file
+                '-ar', '16000',  # Output sample rate (16kHz for Whisper)
+                '-ac', '1',      # Mono audio
+                '-c:a', 'pcm_s16le' if target_format == 'wav' else 'libmp3lame',  # Codec
+                out_path  # Output file
+            ]
+            
+            # Execute ffmpeg and capture output
+            process = subprocess.run(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            
+            if process.returncode != 0:
+                logger.error(f"FFmpeg error: {process.stderr.decode()}")
+                return None
+                
+            # Read the converted file
+            with open(out_path, 'rb') as out_file:
+                converted_data = out_file.read()
+                
+            # Clean up temp files
+            os.unlink(in_path)
+            os.unlink(out_path)
+            
+            logger.info(f"Successfully converted {len(audio_bytes)} bytes from {source_format} to {len(converted_data)} bytes of {target_format}")
+            return converted_data
+            
+        except Exception as e:
+            logger.error(f"Error converting audio format: {e}")
+            return None

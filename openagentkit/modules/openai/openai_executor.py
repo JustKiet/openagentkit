@@ -5,7 +5,7 @@ from openai._types import NOT_GIVEN
 from openai import OpenAI
 from openagentkit.interfaces.base_executor import BaseExecutor
 from openagentkit.modules.openai import OpenAILLMService
-from openagentkit.models.responses import OpenAgentResponse, OpenAIStreamingResponse
+from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.handlers.tool_handler import ToolHandler
 from pydantic import BaseModel
 import json
@@ -33,11 +33,9 @@ class OpenAIExecutor(BaseExecutor):
             max_tokens=max_tokens,
             top_p=top_p,
         )
-        self._temperature = temperature
-        self._max_tokens = max_tokens
-        self._top_p = top_p
-        self._tool_handler = ToolHandler(tools=tools)
 
+        self._tool_handler = ToolHandler(tools=tools)
+    
     def get_history(self) -> List[Dict[str, Any]]:
         return self._llm_service.history
 
@@ -64,9 +62,11 @@ class OpenAIExecutor(BaseExecutor):
                 messages: List[Dict[str, str]],
                 tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
                 response_schema: Optional[BaseModel] = NOT_GIVEN,
-                verbose: bool = False,
+                temperature: Optional[float] = None,
+                max_tokens: Optional[int] = None,
+                top_p: Optional[float] = None,
                 **kwargs,
-               ) -> Union[OpenAgentResponse, BaseModel]:
+               ) -> Generator[OpenAgentResponse, None, None]:
         """
         Execute the OpenAI model and return an OpenAgentResponse object.
 
@@ -74,14 +74,24 @@ class OpenAIExecutor(BaseExecutor):
             messages (List[Dict[str, str]]): The messages to send to the model.
             tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
             response_schema (Optional[BaseModel]): The schema to use in the response.
-            verbose (bool): Whether to print the response. (default: False)
+            temperature (Optional[float]): The temperature to use in the response.
+            max_tokens (Optional[int]): The maximum number of tokens to use in the response.
+            top_p (Optional[float]): The top p to use in the response.
 
         Returns:
-            An OpenAgentResponse object.
+            An OpenAgentResponse generator.
         """
-        kwargs.get("temperature", self._temperature)
-        kwargs.get("max_tokens", self._max_tokens)
-        kwargs.get("top_p", self._top_p)
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self._temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self._max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self._top_p
         
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
@@ -97,7 +107,10 @@ class OpenAIExecutor(BaseExecutor):
             response = self._llm_service.model_generate(
                 messages=context, 
                 tools=tools, 
-                response_schema=response_schema
+                response_schema=response_schema,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
             )
 
             logger.info(f"Response Received: {response}")
@@ -132,50 +145,60 @@ class OpenAIExecutor(BaseExecutor):
                 context = self._llm_service.extend_context(tool_response.tool_messages)
 
                 logger.debug(f"Context: {context}")
-
             else:
                 stop = True
 
-        # Add the final response to the context (chat history)
-        self._llm_service.add_context(
-            {
-                "role": response.role,
-                "content": str(response.content),
-            }
-        )
-        
-        logger.debug(f"Final Response: {response}")
-        
-        # If there is no response, return an error
-        if not response:
-            logger.error("No response from the model")
-            return OpenAgentResponse(
-                role="assistant",
-                content="",
-                tool_results=tool_results,
-                refusal="No response from the model",
-                audio=None,
-            )
-        
-        return OpenAgentResponse(
-            role=response.role,
-            content=str(response.content),
-            tool_calls=response.tool_calls,
-            tool_results=tool_results,
-            refusal=response.refusal,
-            audio=response.audio,
-            usage=response.usage,
-        )
+            if response.content is not None:
+                # Add the final response to the context (chat history)
+                self._llm_service.add_context(
+                    {
+                        "role": response.role,
+                        "content": str(response.content),
+                    }
+                )
+
+                # If there is no response, return an error
+                if not response:
+                    logger.error("No response from the model")
+                    yield OpenAgentResponse(
+                        role="assistant",
+                        content="",
+                        tool_results=tool_results,
+                        refusal="No response from the model",
+                        audio=None,
+                    )
+                
+                yield OpenAgentResponse(
+                    role=response.role,
+                    content=str(response.content),
+                    tool_calls=response.tool_calls,
+                    tool_results=tool_results,
+                    refusal=response.refusal,
+                    audio=response.audio,
+                    usage=response.usage,
+                )
+                
 
     def stream_execute(self, 
                       messages: List[Dict[str, str]],
                       tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
                       response_schema: Optional[BaseModel] = NOT_GIVEN,
+                      temperature: Optional[float] = 0.3,
+                      max_tokens: Optional[int] = None,
+                      top_p: Optional[float] = None,
                       **kwargs,
-                      ) -> Generator[OpenAIStreamingResponse, None, None]:
-        kwargs.get("temperature", self._temperature)
-        kwargs.get("max_tokens", self._max_tokens)
-        kwargs.get("top_p", self._top_p)
+                      ) -> Generator[OpenAgentStreamingResponse, None, None]:
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self.temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self.top_p
         
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
@@ -192,6 +215,9 @@ class OpenAIExecutor(BaseExecutor):
                 messages=context,
                 tools=tools,
                 response_schema=response_schema,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
             )
             
             for chunk in response_generator:

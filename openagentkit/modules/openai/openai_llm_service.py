@@ -4,7 +4,7 @@ from openai._types import NOT_GIVEN
 from pydantic import BaseModel
 from openagentkit.handlers.tool_handler import ToolHandler
 from openagentkit.interfaces.base_llm_model import BaseLLMModel
-from openagentkit.models.responses import OpenAgentResponse, UsageResponse, PromptTokensDetails, CompletionTokensDetails, OpenAIStreamingResponse
+from openagentkit.models.responses import OpenAgentResponse, UsageResponse, PromptTokensDetails, CompletionTokensDetails, OpenAgentStreamingResponse
 import os
 
 class OpenAILLMService(BaseLLMModel):
@@ -19,6 +19,13 @@ class OpenAILLMService(BaseLLMModel):
                  top_p: Optional[float] = None,
                  *args,
                  **kwargs):
+        super().__init__(
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
+            *args,
+            **kwargs
+        )
         # Create an instance of ToolHandler instead of inheriting from it
         self._tool_handler = ToolHandler(tools=tools)
         
@@ -26,9 +33,6 @@ class OpenAILLMService(BaseLLMModel):
         self._model = model
         self._system_message = system_message
         self._api_key = api_key
-        self._temperature = temperature
-        self._max_tokens = max_tokens
-        self._top_p = top_p
         self._context_history = [
             {
                 "role": "system",
@@ -52,7 +56,22 @@ class OpenAILLMService(BaseLLMModel):
                               messages: List[Dict[str, str]],
                               tools: Optional[List[Dict[str, Any]]],
                               response_schema: Optional[BaseModel] = NOT_GIVEN,
-                              ) -> OpenAgentResponse:
+                              temperature: Optional[float] = None,
+                              max_tokens: Optional[int] = None,
+                              top_p: Optional[float] = None,
+                              **kwargs) -> OpenAgentResponse:
+
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self._temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self._max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self._top_p
 
         if tools is None:
             tools = self.tools
@@ -122,14 +141,24 @@ class OpenAILLMService(BaseLLMModel):
     def model_generate(self, 
                        messages: List[Dict[str, str]],
                        tools: Optional[List[Dict[str, Any]]] = None,
-                       response_schema: Optional[BaseModel] = NOT_GIVEN) -> OpenAgentResponse:
+                       response_schema: Optional[BaseModel] = NOT_GIVEN,
+                       temperature: Optional[float] = None,
+                       max_tokens: Optional[int] = None,
+                       top_p: Optional[float] = None,
+                       **kwargs) -> OpenAgentResponse:
         """
         Generate a response from the model.
         
-        :param messages: The messages to send to the model.
-        :param tools: The tools to use in the response.
-        :param response_schema: The schema to use in the response.
-        :return: An OpenAgentResponse object.
+        Args:
+            messages: The messages to send to the model.
+            tools: The tools to use in the response.
+            response_schema: The schema to use in the response.
+            temperature: The temperature to use in the response.
+            max_tokens: The maximum number of tokens to use in the response.
+            top_p: The top p to use in the response.
+        
+        Returns:
+            An OpenAgentResponse object.
 
         Example:
         ```python
@@ -140,6 +169,19 @@ class OpenAILLMService(BaseLLMModel):
         response = llm_service.model_generate(messages=[{"role": "user", "content": "What is TECHVIFY?"}])
         ```
         """
+
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self._temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self._max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self._top_p
+
         if tools is None:
             tools = self.tools
             
@@ -160,7 +202,7 @@ class OpenAILLMService(BaseLLMModel):
         
         return response
         
-    def add_context(self, content: List[dict] | dict):
+    def add_context(self, content: dict[str, str]):
         if not content:
             return self._context_history
         
@@ -183,9 +225,29 @@ class OpenAILLMService(BaseLLMModel):
         return result
 
     def _handle_client_stream(self,
-                            messages: List[Dict[str, str]],
-                            tools: Optional[List[Dict[str, Any]]] = None,
-                            response_schema: BaseModel = NOT_GIVEN) -> Generator[OpenAIStreamingResponse, None, None]:
+                              messages: List[Dict[str, str]],
+                              tools: Optional[List[Dict[str, Any]]] = None,
+                              response_schema: BaseModel = NOT_GIVEN,
+                              temperature: Optional[float] = 0.3,
+                              max_tokens: Optional[int] = None,
+                              top_p: Optional[float] = None,
+                              **kwargs) -> Generator[OpenAgentStreamingResponse, None, None]:
+        
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self._temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self._max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self._top_p
+        
+        if tools == NOT_GIVEN:
+            tools = self._llm_service.tools
+        
         
         if tools is None:
             tools = self.tools
@@ -216,7 +278,7 @@ class OpenAILLMService(BaseLLMModel):
                 # If the chunk has content, yield it
                 if chunk.choices[0].delta.content is not None:
                     final_content += chunk.choices[0].delta.content
-                    yield OpenAIStreamingResponse(
+                    yield OpenAgentStreamingResponse(
                         role="assistant",
                         delta_content=chunk.choices[0].delta.content,
                         finish_reason=chunk.choices[0].finish_reason,
@@ -234,7 +296,7 @@ class OpenAILLMService(BaseLLMModel):
             
             # After the stream is done, yield the final response with usage info if available
             if final_chunk and hasattr(final_chunk, 'usage'):
-                yield OpenAIStreamingResponse(
+                yield OpenAgentStreamingResponse(
                     role="assistant",
                     content=final_content,
                     finish_reason="tool_calls" if final_tool_calls else "stop",
@@ -282,15 +344,35 @@ class OpenAILLMService(BaseLLMModel):
     
     def model_stream(self,
                    messages: List[Dict[str, str]],
-                   tools: List[Dict[str, Any]] = None,
-                   response_schema: BaseModel = NOT_GIVEN) -> Generator[OpenAIStreamingResponse, None, None]:
+                   tools: Optional[List[Dict[str, Any]]] = None,
+                   response_schema: BaseModel = NOT_GIVEN,
+                   temperature: Optional[float] = None,
+                   max_tokens: Optional[int] = None,
+                   top_p: Optional[float] = None,
+                   **kwargs) -> Generator[OpenAgentStreamingResponse, None, None]:
+        
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self._temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self._max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self._top_p
+
         if tools is None:
             tools = self.tools
 
         generator = self._handle_client_stream(
             messages=messages, 
             tools=tools,
-            response_schema=response_schema
+            response_schema=response_schema,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
         )
 
         for chunk in generator:

@@ -1,11 +1,11 @@
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union, Literal
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN, NotGiven
 from pydantic import BaseModel
 from openagentkit.handlers.tool_handler import ToolHandler
 from openagentkit.interfaces import AsyncBaseLLMModel
 from openagentkit.models.responses import (
-    OpenAIStreamingResponse, 
+    OpenAgentStreamingResponse, 
     OpenAgentResponse, 
     UsageResponse, 
     PromptTokensDetails, 
@@ -14,6 +14,8 @@ from openagentkit.models.responses import (
 from typing import AsyncGenerator
 import asyncio
 import os
+import json
+from loguru import logger
 
 class AsyncOpenAILLMService(AsyncBaseLLMModel):
     def __init__(self, 
@@ -27,6 +29,11 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                  top_p: Optional[float] = None,
                  *args,
                  **kwargs):
+        super().__init__(
+            temperature=temperature, 
+            max_tokens=max_tokens, 
+            top_p=top_p
+        )
         # Create an instance of ToolHandler instead of inheriting from it
         self._tool_handler = ToolHandler(tools=tools)
         
@@ -34,9 +41,6 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         self._model = model
         self._system_message = system_message
         self._api_key = api_key
-        self._temperature = temperature
-        self._max_tokens = max_tokens
-        self._top_p = top_p
         self._context_history = [
             {
                 "role": "system",
@@ -46,13 +50,26 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
     
     @property
     def history(self):
+        """
+        Get the history of the conversation.
+
+        Returns:
+            The history of the conversation.
+        """
         return self._context_history
     
     # Property to access tools from the tool handler
     @property
     def tools(self):
+        """
+        Get the tools from the tool handler.
+
+        Returns:
+            The tools from the tool handler.
+        """
         return self._tool_handler.tools
         
+    # NOTE: Why is this even needed?
     async def define_system_message(self) -> str:
         return self._system_message
     
@@ -60,8 +77,39 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                                      messages: List[Dict[str, str]],
                                      tools: Optional[List[Dict[str, Any]]],
                                      response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN,
-                                     ) -> OpenAgentResponse:
+                                     temperature: Optional[float] = None,
+                                     max_tokens: Optional[int] = None,
+                                     top_p: Optional[float] = None,
+                                     audio: Optional[bool] = False,
+                                     audio_format: Optional[str] = "pcm16",
+                                     audio_voice: Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]] = "alloy",
+                                     **kwargs) -> OpenAgentResponse:
+        """
+        Handle the client request.
 
+        Args:
+            messages: The messages to send to the model.
+            tools: The tools to use in the response.
+            response_schema: The schema to use in the response.
+            temperature: The temperature to use in the response.
+            max_tokens: The max tokens to use in the response.
+            top_p: The top p to use in the response.
+
+        Returns:
+            An OpenAgentResponse object.
+        """
+
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self.temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self.top_p
 
         if response_schema is NOT_GIVEN or isinstance(response_schema, NotGiven):
             # Handle the client request without response schema
@@ -69,9 +117,14 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                     model=self._model,
                     messages=messages,
                     tools=tools,
-                    temperature=self._temperature,
-                    max_tokens=self._max_tokens,
-                    top_p=self._top_p,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    top_p=top_p,
+                    modalities=["text", "audio"] if audio else ["text"],
+                    audio={
+                        "format": audio_format,
+                        "voice": audio_voice,
+                    } if audio else None,
             )
             
             response_message = client_response.choices[0].message
@@ -92,9 +145,9 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                 messages=messages,
                 tools=tools,
                 response_format=response_schema,
-                temperature=self._temperature,
-                max_tokens=self._max_tokens,
-                top_p=self._top_p,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
             )
 
             response_message = client_response.choices[0].message
@@ -130,8 +183,44 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
     async def _handle_client_stream(self,
                                     messages: List[Dict[str, str]],
                                     tools: Optional[List[Dict[str, Any]]] = None,
-                                    response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN) -> AsyncGenerator[OpenAIStreamingResponse, None]:
+                                    response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN,
+                                    temperature: Optional[float] = None,
+                                    max_tokens: Optional[int] = None,
+                                    top_p: Optional[float] = None,
+                                    audio: Optional[bool] = False,
+                                    audio_format: Optional[str] = "pcm16",
+                                    audio_voice: Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]] = "alloy",
+                                    **kwargs) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
+        """
+        Handle the client stream.
+
+        Args:
+            messages: The messages to send to the model.
+            tools: The tools to use in the response.
+            response_schema: The schema to use in the response. **(not implemented yet)**
+            temperature: The temperature to use in the response.
+            max_tokens: The max tokens to use in the response.
+            top_p: The top p to use in the response.
+
+        Returns:
+            An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        """
+        # TODO: THIS IS A PLACEHOLDER FOR NOW, WE NEED TO IMPLEMENT THE STREAMING FOR THE RESPONSE SCHEMA
+        if response_schema is not NOT_GIVEN and isinstance(response_schema, BaseModel):
+            raise ValueError("Response schema is not supported for streaming")
         
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self.temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self.top_p
+
         if tools is None:
             tools = self.tools
         
@@ -140,17 +229,23 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                 model=self._model,
                 messages=messages,
                 tools=tools,
-                temperature=self._temperature,
-                max_tokens=self._max_tokens,
-                top_p=self._top_p,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
                 stream=True,
                 stream_options={"include_usage": True},
+                modalities=["text", "audio"] if audio else ["text"],
+                audio={
+                    "format": audio_format,
+                    "voice": audio_voice,
+                } if audio else None,
             )
 
+            # Initialize variables to store the final tool calls, content, and chunk
             final_tool_calls = {}
             final_content = ""
             final_chunk = None
-            
+
             async for chunk in client_stream:
                 final_chunk = chunk  # Store the last chunk for usage info
                 
@@ -161,7 +256,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                 # If the chunk has content, yield it
                 if chunk.choices[0].delta.content is not None:
                     final_content += chunk.choices[0].delta.content
-                    yield OpenAIStreamingResponse(
+                    yield OpenAgentStreamingResponse(
                         role="assistant",
                         delta_content=chunk.choices[0].delta.content,
                         finish_reason=chunk.choices[0].finish_reason,
@@ -176,10 +271,27 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                             final_tool_calls[index] = tool_call
 
                         final_tool_calls[index].function.arguments += tool_call.function.arguments
+
+                # Handle audio chunks (if available)
+                if chunk.choices[0].delta.model_dump().get("audio") is not None:
+                    if chunk.choices[0].delta.model_dump().get("audio").get("data") is not None:
+                        yield OpenAgentStreamingResponse(
+                            role="assistant",
+                            delta_audio=chunk.choices[0].delta.model_dump().get("audio").get("data"),
+                            finish_reason=chunk.choices[0].finish_reason,
+                        )
+                    
+                    if chunk.choices[0].delta.model_dump().get("audio").get("transcript") is not None:
+                        final_content += chunk.choices[0].delta.model_dump().get("audio").get("transcript")
+                        yield OpenAgentStreamingResponse(
+                            role="assistant",
+                            delta_content=chunk.choices[0].delta.model_dump().get("audio").get("transcript"),
+                            finish_reason=chunk.choices[0].finish_reason,
+                        )
             
             # After the stream is done, yield the final response with usage info if available
-            if final_chunk and hasattr(final_chunk, 'usage'):
-                yield OpenAIStreamingResponse(
+            if final_chunk and hasattr(final_chunk, 'usage') and final_chunk.usage is not None:
+                yield OpenAgentStreamingResponse(
                     role="assistant",
                     content=final_content,  # Empty content for the final usage info
                     finish_reason="tool_calls" if final_tool_calls else "stop",
@@ -200,39 +312,97 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                         ),
                     ),
                 )
+            else:
+                logger.warning("Final chunk or usage is None")
+                
+                yield OpenAgentStreamingResponse(
+                    role="assistant",
+                    content=final_content,
+                    finish_reason="tool_calls" if final_tool_calls else "stop",
+                    tool_calls=list(final_tool_calls.values()),
+                )
+
+        
+        # TODO: Handle the case with response schema (not working)
         else:
-            with self._client.beta.chat.completions.stream(
+            async with self._client.beta.chat.completions.stream(
                 model=self._model,
                 messages=messages,
                 tools=tools,
-                temperature=self._temperature,
-                max_tokens=self._max_tokens,
-                top_p=self._top_p,
-                stream=True,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
                 stream_options={"include_usage": True},
                 response_format=response_schema,
-            ) as stream:
-                for event in stream:
+            ) as client_stream:
+                async for event in client_stream:
                     if event.type == "content.delta":
                         if event.parsed is not None:
-                            # Print the parsed data as JSON
-                            print("content.delta parsed:", event.parsed)
-                    elif event.type == "content.done":
-                        print("content.done")
-                    elif event.type == "error":
-                        print("Error in stream:", event.error)
-
-            final_completion = stream.get_final_completion()
-            print("Final completion:", final_completion)
+                                # Print the parsed data as JSON
+                                print("content.delta parsed:", event.parsed)
+                                break
+                        elif event.type == "content.done":
+                            print("content.done")
+                            break
+                        elif event.type == "error":
+                            print("Error in stream:", event.error)
+                            break
 
     async def model_stream(self,
                            messages: List[Dict[str, str]],
                            tools: Optional[List[Dict[str, Any]]] = None,
-                           response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN) -> AsyncGenerator[OpenAIStreamingResponse, None]:
+                           response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN,
+                           temperature: Optional[float] = None,
+                           max_tokens: Optional[int] = None,
+                           top_p: Optional[float] = None,
+                           audio: Optional[bool] = False,
+                           audio_format: Optional[str] = "pcm16",
+                           audio_voice: Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]] = "alloy",
+                           **kwargs) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
+        """
+        Generate a response from the model.
+
+        Args:
+            messages: The messages to send to the model.
+            tools: The tools to use in the response.
+            response_schema: The schema to use in the response. **(not implemented yet)**
+            temperature: The temperature to use in the response.
+            max_tokens: The max tokens to use in the response.
+            top_p: The top p to use in the response.
+
+        Returns:
+            An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        """
+        # TODO: Handle the case with response schema (not working)
+        if response_schema is not NOT_GIVEN and isinstance(response_schema, BaseModel):
+            raise ValueError("Response schema is not supported for streaming")
+        
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self.temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self.top_p
+
         if tools is None:
             tools = self.tools
 
-        generator = self._handle_client_stream(messages, tools, response_schema)
+        generator = self._handle_client_stream(
+            messages=messages, 
+            tools=tools, 
+            response_schema=response_schema, 
+            temperature=temperature, 
+            max_tokens=max_tokens, 
+            top_p=top_p,
+            audio=audio,
+            audio_format=audio_format,
+            audio_voice=audio_voice,
+        )
 
         async for chunk in generator:
             if chunk.tool_calls:
@@ -244,16 +414,29 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             yield chunk
         
     async def model_generate(self, 
-                       messages: List[Dict[str, str]],
-                       tools: Optional[List[Dict[str, Any]]] = None,
-                       response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN) -> OpenAgentResponse:
+                             messages: List[Dict[str, str]],
+                             tools: Optional[List[Dict[str, Any]]] = None,
+                             response_schema: Union[BaseModel, NotGiven] = NOT_GIVEN,
+                             temperature: Optional[float] = None,
+                             max_tokens: Optional[int] = None,
+                             top_p: Optional[float] = None,
+                             audio: Optional[bool] = False,
+                             audio_format: Optional[str] = "pcm16",
+                             audio_voice: Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]] = "alloy",
+                             **kwargs) -> OpenAgentResponse:
         """
         Generate a response from the model.
         
-        :param messages: The messages to send to the model.
-        :param tools: The tools to use in the response.
-        :param response_schema: The schema to use in the response.
-        :return: An OpenAgentResponse object.
+        Args:
+            messages: The messages to send to the model.
+            tools: The tools to use in the response.
+            response_schema: The schema to use in the response.
+            temperature: The temperature to use in the response.
+            max_tokens: The max tokens to use in the response.
+            top_p: The top p to use in the response.
+
+        Returns:
+            An OpenAgentResponse object.
 
         Example:
         ```python
@@ -264,6 +447,18 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         response = await llm_service.model_generate(messages=[{"role": "user", "content": "What is TECHVIFY?"}])
         ```
         """
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self.temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self.top_p
+
         if tools is None:
             tools = self.tools
             
@@ -274,6 +469,9 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             messages=messages, 
             response_schema=response_schema, 
             tools=tools,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            top_p=top_p,
         )
             
         # Extract tool_calls arguments using the tool handler
@@ -284,7 +482,16 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         
         return response
         
-    async def add_context(self, content: List[dict] | dict):
+    async def add_context(self, content: dict[str, str]):
+        """
+        Add context to the model.
+
+        Args:
+            content: The content to add to the context.
+
+        Returns:
+            The context history.
+        """
         if not content:
             return self._context_history
         
@@ -292,6 +499,15 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         return self._context_history
         
     async def extend_context(self, content: List[dict[str, str]]):
+        """
+        Extend the context of the model.
+
+        Args:
+            content: The content to extend the context with.
+
+        Returns:
+            The context history.
+        """
         if not content:
             return self._context_history
         
@@ -300,6 +516,16 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
     
     # Delegate tool call handling to the tool handler
     async def _handle_tool_call(self, tool_name, **tool_args):
+        """
+        Handle the tool call.
+
+        Args:
+            tool_name: The name of the tool to handle.
+            **tool_args: The arguments to pass to the tool.
+
+        Returns:
+            The result of the tool call.
+        """
         result = self._tool_handler._handle_tool_call(tool_name, **tool_args)
         # Convert result to string if it's not already
         if not isinstance(result, str):

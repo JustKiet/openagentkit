@@ -3,3 +3,4 @@ from .openai_speech_service import OpenAISpeechService
 from .openai_executor import OpenAIExecutor
 from .async_openai_executor import AsyncOpenAIExecutor
 from .async_openai_llm_service import AsyncOpenAILLMService
+from .openai_embedding_service import OpenAIEmbeddingModel

@@ -3,7 +3,7 @@ from loguru import logger
 from openai._types import NOT_GIVEN
 import json
 from pydantic import BaseModel
-from openagentkit.models.responses import OpenAgentResponse, OpenAIStreamingResponse
+from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.models.tool_responses import ToolResponse
 
 class ToolHandler:
@@ -56,7 +56,7 @@ class ToolHandler:
             ]
         return tool_calls
     
-    def handle_notification(self, chunk: OpenAIStreamingResponse) -> Union[OpenAIStreamingResponse, None]:
+    def handle_notification(self, chunk: OpenAgentStreamingResponse) -> Union[OpenAgentStreamingResponse, None]:
         """
         Handle the notification from the tool call chunk
         """
@@ -74,7 +74,7 @@ class ToolHandler:
 
             if notification:
                 logger.info(f"Tool Notification: {tool_notification}")
-                return OpenAIStreamingResponse(
+                return OpenAgentStreamingResponse(
                     role="assistant",
                     content="",
                     tool_notification=tool_notification,
@@ -86,7 +86,7 @@ class ToolHandler:
         """
         Handle tool requests and get the final response with tool results
         """
-        assert type(response) == OpenAgentResponse or type(response) == OpenAIStreamingResponse, "Response must be an OpenAgentResponse or OpenAIStreamingResponse object"
+        assert type(response) == OpenAgentResponse or type(response) == OpenAgentStreamingResponse, "Response must be an OpenAgentResponse or OpenAgentStreamingResponse object"
         
         tool_args_list = []
         tool_results_list = []

@@ -5,7 +5,7 @@ from openai._types import NOT_GIVEN
 from openai import AsyncOpenAI
 from openagentkit.interfaces.async_base_executor import AsyncBaseExecutor
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
-from openagentkit.models.responses import OpenAgentResponse, OpenAIStreamingResponse
+from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.handlers.tool_handler import ToolHandler
 from pydantic import BaseModel
 import json
@@ -58,10 +58,19 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             max_tokens=max_tokens,
             top_p=top_p,
         )
-        self._temperature = temperature
-        self._max_tokens = max_tokens
-        self._top_p = top_p
         self._tool_handler = ToolHandler(tools=tools)
+
+    @property
+    def temperature(self) -> float:
+        return self._llm_service.temperature
+
+    @property
+    def max_tokens(self) -> int:
+        return self._llm_service.max_tokens
+    
+    @property
+    def top_p(self) -> float:
+        return self._llm_service.top_p
 
     def get_history(self) -> List[Dict[str, Any]]:
         return self._llm_service.history
@@ -89,8 +98,11 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                       messages: List[Dict[str, str]],
                       tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
                       response_schema: Optional[BaseModel] = NOT_GIVEN,
+                      temperature: Optional[float] = None,
+                      max_tokens: Optional[int] = None,
+                      top_p: Optional[float] = None,
                       **kwargs,
-                    ) -> OpenAgentResponse:
+                    ) -> AsyncGenerator[OpenAgentResponse, None]:
         """
         Asynchronously execute the OpenAI model and return an OpenAgentResponse object.
 
@@ -103,16 +115,26 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         Returns:
             An OpenAgentResponse object.
         """
-        kwargs.get("temperature", self._temperature)
-        kwargs.get("max_tokens", self._max_tokens)
-        kwargs.get("top_p", self._top_p)
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self.temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self.top_p
+        
+        debug = kwargs.get("debug", False)
         
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
         
         context = await self._llm_service.extend_context(messages)
         
-        logger.debug(f"Context: {context}")
+        logger.debug(f"Context: {context}") if debug else None
         
         stop = False
         
@@ -121,7 +143,10 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             response = await self._llm_service.model_generate(
                 messages=context, 
                 tools=tools, 
-                response_schema=response_schema
+                response_schema=response_schema,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
             )
 
             logger.info(f"Response Received: {response}")
@@ -151,55 +176,70 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                     response=response,
                 )
 
-                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
+                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
                 context = await self._llm_service.extend_context(tool_response.tool_messages)
 
-                logger.debug(f"Context: {context}")
+                logger.debug(f"Context: {context}") if debug else None
             
             else:
                 stop = True
-
-        # Add the final response to the context (chat history)
-        await self._llm_service.add_context(
-            {
-                "role": response.role,
-                "content": str(response.content),
-            }
-        )
-        
-        logger.debug(f"Final Response: {response}")
-        
-        # If there is no response, return an error
-        if not response:
-            logger.error("No response from the model")
-            return OpenAgentResponse(
-                role="assistant",
-                content="",
-                tool_results=tool_results,
-                refusal="No response from the model",
-                audio=None,
-            )
-        
-        return OpenAgentResponse(
-            role=response.role,
-            content=str(response.content),
-            tool_calls=response.tool_calls,
-            tool_results=tool_results,
-            refusal=response.refusal,
-            audio=response.audio,
-            usage=response.usage,
-        )
+            
+            if response.content is not None:
+                # Add the final response to the context (chat history)
+                await self._llm_service.add_context(
+                    {
+                        "role": response.role,
+                        "content": str(response.content),
+                    }
+                )
+                
+                # If there is no response, return an error
+                if not response:
+                    logger.error("No response from the model")
+                    yield OpenAgentResponse(
+                        role="assistant",
+                        content="",
+                        tool_results=tool_results,
+                        refusal="No response from the model",
+                        audio=None,
+                    )
+                
+                yield OpenAgentResponse(
+                    role=response.role,
+                    content=str(response.content),
+                    tool_calls=response.tool_calls,
+                    tool_results=tool_results,
+                    refusal=response.refusal,
+                    audio=response.audio,
+                    usage=response.usage,
+                )
 
     async def stream_execute(self, 
                              messages: List[Dict[str, str]],
                              tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
                              response_schema: Optional[BaseModel] = NOT_GIVEN,
+                             temperature: Optional[float] = None,
+                             max_tokens: Optional[int] = None,
+                             top_p: Optional[float] = None,
+                             audio: Optional[bool] = False,
+                             audio_format: Optional[str] = "pcm16",
+                             audio_voice: Optional[str] = "alloy",
                              **kwargs,
-                             ) -> AsyncGenerator[OpenAIStreamingResponse, None]:
-        kwargs.get("temperature", self._temperature)
-        kwargs.get("max_tokens", self._max_tokens)
-        kwargs.get("top_p", self._top_p)
+                             ) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
+        temperature = kwargs.get("temperature", temperature)
+        if temperature is None:
+            temperature = self.temperature
+
+        max_tokens = kwargs.get("max_tokens", max_tokens)
+        if max_tokens is None:
+            max_tokens = self.max_tokens
+
+        top_p = kwargs.get("top_p", top_p)
+        if top_p is None:
+            top_p = self.top_p
+            
+        debug = kwargs.get("debug", False)
         
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
@@ -208,14 +248,19 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
         context = await self._llm_service.extend_context(messages)
 
-        while not stop: 
-
-            logger.debug(f"Context: {context}")
+        while not stop:
+            logger.debug(f"Context: {context}") if debug else None
 
             response_generator = self._llm_service.model_stream(
                 messages=context,
                 tools=tools,
                 response_schema=response_schema,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
+                audio=audio,
+                audio_format=audio_format,
+                audio_voice=audio_voice,
             )
             
             async for chunk in response_generator:
@@ -229,7 +274,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                         }
                     )
 
-                    logger.debug(f"Context: {context}")
+                    logger.debug(f"Context: {context}") if debug else None
 
                     # Handle the notification (if any) from the tool call chunk
                     notification = self._tool_handler.handle_notification(chunk)
@@ -243,13 +288,14 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                         response=chunk,
                     )
 
-                    logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
+                    logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
                     context = await self._llm_service.extend_context(tool_response.tool_messages)
                     
-                    logger.debug(f"Context in Stream Execute: {context}")
+                    logger.debug(f"Context in Stream Execute: {context}") if debug else None
 
                 elif chunk.finish_reason == "stop":
+                    logger.debug(f"Final Chunk: {chunk}") if debug else None
                     if chunk.content:
                         context = await self._llm_service.add_context(
                             {
@@ -257,7 +303,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                                 "content": str(chunk.content),
                             }
                         )
-                        logger.info(f"Context: {context}")
+                        logger.debug(f"Context: {context}") if debug else None
                         yield chunk
                         stop = True
                 else:

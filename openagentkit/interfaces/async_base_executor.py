@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from openagentkit.models.responses import OpenAgentResponse
-from typing import Optional
+from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from typing import Optional, AsyncGenerator
 
 class AsyncBaseExecutor(ABC):
     @abstractmethod
@@ -9,4 +9,8 @@ class AsyncBaseExecutor(ABC):
 
     @abstractmethod
     async def execute(self) -> OpenAgentResponse:
+        raise NotImplementedError
+    
+    @abstractmethod
+    async def stream_execute(self) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
         raise NotImplementedError

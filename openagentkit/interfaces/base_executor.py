@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-from openagentkit.models.responses import OpenAgentResponse
-from typing import Optional
+from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from typing import Optional, Generator
 
 class BaseExecutor(ABC):
     @abstractmethod
@@ -9,4 +9,8 @@ class BaseExecutor(ABC):
 
     @abstractmethod
     def execute(self) -> OpenAgentResponse:
+        raise NotImplementedError
+    
+    @abstractmethod
+    def stream_execute(self) -> Generator[OpenAgentStreamingResponse, None, None]:
         raise NotImplementedError
