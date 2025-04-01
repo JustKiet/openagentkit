@@ -110,10 +110,26 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             messages (List[Dict[str, str]]): The messages to send to the model.
             tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
             response_schema (Optional[BaseModel]): The schema to use in the response.
-            verbose (bool): Whether to print the response. (default: False)
+            temperature (Optional[float]): The temperature to use in the response.
+            max_tokens (Optional[int]): The maximum number of tokens to use in the response.
+            top_p (Optional[float]): The top p to use in the response.
 
         Returns:
-            An OpenAgentResponse object.
+            An OpenAgentResponse asynchronous generator.
+
+        Example:
+        ```python
+        from openagentkit.modules.openai import AsyncOpenAIExecutor
+        from openagentkit.tools import duckduckgo_search_tool
+        from openai import AsyncOpenAI
+        
+        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        executor = AsyncOpenAIExecutor(client=client, tools=[duckduckgo_search_tool])
+        async for response in executor.execute(
+            messages=[{"role": "user", "content": "What is Quantum Mechanics?"}]
+        ):
+            print(response)
+        ```
         """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
@@ -227,6 +243,39 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                              audio_voice: Optional[str] = "alloy",
                              **kwargs,
                              ) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
+        """
+        Asynchronously stream the OpenAI model and return an OpenAgentStreamingResponse object.
+
+        Args:
+            messages (List[Dict[str, str]]): The messages to send to the model.
+            tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
+            response_schema (Optional[BaseModel]): The schema to use in the response.
+            temperature (Optional[float]): The temperature to use in the response.
+            max_tokens (Optional[int]): The maximum number of tokens to use in the response.
+            top_p (Optional[float]): The top p to use in the response.
+            audio (Optional[bool]): Whether to use audio in the response.
+            audio_format (Optional[str]): The format to use in the response.
+            audio_voice (Optional[str]): The voice to use in the response.
+
+        Returns:
+            An OpenAgentStreamingResponse asynchronous generator.
+
+        Example:
+        ```python
+        from openagentkit.modules.openai import AsyncOpenAIExecutor
+        from openagentkit.tools import duckduckgo_search_tool
+        from openai import AsyncOpenAI
+
+        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+        executor = AsyncOpenAIExecutor(client=client, tools=[duckduckgo_search_tool])
+
+        async for chunk in executor.stream_execute(
+            messages=[{"role": "user", "content": "What is Quantum Mechanics?"}]
+        ):
+            print(chunk)
+        ```
+        """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
             temperature = self.temperature

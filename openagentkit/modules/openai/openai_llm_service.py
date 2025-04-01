@@ -343,13 +343,13 @@ class OpenAILLMService(BaseLLMModel):
             print("Final completion:", final_completion)
     
     def model_stream(self,
-                   messages: List[Dict[str, str]],
-                   tools: Optional[List[Dict[str, Any]]] = None,
-                   response_schema: BaseModel = NOT_GIVEN,
-                   temperature: Optional[float] = None,
-                   max_tokens: Optional[int] = None,
-                   top_p: Optional[float] = None,
-                   **kwargs) -> Generator[OpenAgentStreamingResponse, None, None]:
+                     messages: List[Dict[str, str]],
+                     tools: Optional[List[Dict[str, Any]]] = None,
+                     response_schema: BaseModel = NOT_GIVEN,
+                     temperature: Optional[float] = None,
+                     max_tokens: Optional[int] = None,
+                     top_p: Optional[float] = None,
+                     **kwargs) -> Generator[OpenAgentStreamingResponse, None, None]:
         
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:

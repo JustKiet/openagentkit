@@ -22,7 +22,15 @@ class OpenAISpeechService(BaseSpeechModel):
         self.stt_model = stt_model
     
     def speech_to_text(self, audio_data: bytes) -> str:
-        """Convert speech audio data to text using OpenAI's API."""
+        """
+        Convert speech audio data to text using OpenAI's API.
+
+        Args:
+            audio_data (bytes): The audio data to convert to text.
+
+        Returns:
+            str: The text transcription of the audio data.
+        """
         try:
             # Detect the audio format
             audio_format = AudioUtility.detect_audio_format(audio_data)
@@ -152,7 +160,16 @@ class OpenAISpeechService(BaseSpeechModel):
                        message: str,
                        response_format: Optional[str] = "wav",
                        ) -> bytes:
-        """Convert text to speech."""
+        """
+        Convert text to speech.
+
+        Args:
+            message (str): The text to convert to speech.
+            response_format (Optional[str]): The format to use in the response.
+
+        Returns:
+            bytes: The audio data in bytes.
+        """
         response = self._client.audio.speech.create(
             model="tts-1",
             voice=self.voice,

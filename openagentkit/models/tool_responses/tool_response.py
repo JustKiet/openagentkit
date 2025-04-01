@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 
+# TODO: NOT IMPLEMENTED YET. SHOULD BE USED IN THE FUTURE.
 class ToolCallFunction(BaseModel):
     name: str
     arguments: str

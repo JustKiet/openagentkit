@@ -188,6 +188,20 @@ class OpenAIExecutor(BaseExecutor):
                       top_p: Optional[float] = None,
                       **kwargs,
                       ) -> Generator[OpenAgentStreamingResponse, None, None]:
+        """
+        Stream execute the OpenAI model and return an OpenAgentStreamingResponse object.
+
+        Args:
+            messages (List[Dict[str, str]]): The messages to send to the model.
+            tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
+            response_schema (Optional[BaseModel]): The schema to use in the response.
+            temperature (Optional[float]): The temperature to use in the response.
+            max_tokens (Optional[int]): The maximum number of tokens to use in the response.
+            top_p (Optional[float]): The top p to use in the response.
+
+        Returns:
+            An OpenAgentStreamingResponse generator.
+        """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
             temperature = self.temperature

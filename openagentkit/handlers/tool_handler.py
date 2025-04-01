@@ -7,6 +7,21 @@ from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingR
 from openagentkit.models.tool_responses import ToolResponse
 
 class ToolHandler:
+    """
+    A class to handle tool calls.
+    
+    ## Methods:
+        `parse_tool_args()`: A method to parse the tool calls from the response.
+
+        `handle_notification()`: A method to handle the notification from the tool call chunk.
+
+        `handle_tool_request()`: A method to handle the tool request and get the final response with tool results.
+
+    ## Properties:
+        `tools`: A property to get and set the tools.
+
+        `tools_map`: A property to get the tools map.
+    """
     def __init__(self,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
                  *args,
@@ -30,7 +45,17 @@ class ToolHandler:
         } if tools is not NOT_GIVEN else NOT_GIVEN
         return logger.info(f"Binded {len(self._tools)} tools.")
     
-    def _handle_tool_call(self, tool_name, **kwargs) -> BaseModel:
+    def _handle_tool_call(self, tool_name: str, **kwargs) -> BaseModel:
+        """
+        Handle the tool call and return the tool result.
+
+        Args:
+            tool_name (str): The name of the tool to handle.
+            **kwargs: The keyword arguments to pass to the tool.
+
+        Returns:
+            BaseModel: The tool result (the tool response must be a Pydantic BaseModel)
+        """
         if self.tools_map is not NOT_GIVEN:
             tool = self.tools_map.get(tool_name)
             if not tool:
@@ -40,7 +65,16 @@ class ToolHandler:
             logger.error("No tools provided")
             return None
     
-    def parse_tool_args(self, response: dict):
+    def parse_tool_args(self, response: dict) -> list[dict[str, Any]]:
+        """
+        Parse the tool calls from the response.
+
+        Args:
+            response (dict): The response from the OpenAI model.
+
+        Returns:
+            list[dict[str, Any]]: The tool calls.
+        """
         tool_calls = None
         if hasattr(response, "tool_calls") and response.tool_calls is not None:
             tool_calls = [
@@ -59,6 +93,12 @@ class ToolHandler:
     def handle_notification(self, chunk: OpenAgentStreamingResponse) -> Union[OpenAgentStreamingResponse, None]:
         """
         Handle the notification from the tool call chunk
+
+        Args:
+            chunk (OpenAgentStreamingResponse): The chunk from the OpenAI model.
+
+        Returns:
+            Union[OpenAgentStreamingResponse, None]: The notification.
         """
         notification = chunk.tool_calls[0].get("function")
         tool_notification = None
@@ -85,6 +125,12 @@ class ToolHandler:
     def handle_tool_request(self, response: OpenAgentResponse) -> ToolResponse:
         """
         Handle tool requests and get the final response with tool results
+
+        Args:
+            response (OpenAgentResponse or OpenAgentStreamingResponse): The response from the OpenAI model.
+
+        Returns:
+            ToolResponse: The final response with tool results.
         """
         assert type(response) == OpenAgentResponse or type(response) == OpenAgentStreamingResponse, "Response must be an OpenAgentResponse or OpenAgentStreamingResponse object"
         
@@ -137,8 +183,7 @@ class ToolHandler:
                 "content": tool_result_str,  # Use string representation
             }
 
-            tool_messages_list.append(tool_message)
-            
+            tool_messages_list.append(tool_message)  
         
         return ToolResponse(
             tool_args=tool_args_list,
