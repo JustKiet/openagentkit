@@ -472,6 +472,9 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             temperature=temperature,
             max_tokens=max_tokens,
             top_p=top_p,
+            audio=audio,
+            audio_format=audio_format,
+            audio_voice=audio_voice,
         )
             
         # Extract tool_calls arguments using the tool handler
