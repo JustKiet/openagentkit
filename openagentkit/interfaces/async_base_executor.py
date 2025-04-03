@@ -81,3 +81,13 @@ class AsyncBaseExecutor(ABC):
             AsyncGenerator[OpenAgentStreamingResponse, None]: The streamed response.
         """
         raise NotImplementedError
+    
+    @abstractmethod
+    def get_history(self) -> List[Dict[str, Any]]:
+        """
+        An abstract method to get the history of the conversation.
+
+        Returns:
+            List[Dict[str, Any]]: The history of the conversation.
+        """
+        raise NotImplementedError

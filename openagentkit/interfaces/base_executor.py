@@ -74,3 +74,13 @@ class BaseExecutor(ABC):
             Generator[OpenAgentStreamingResponse, None, None]: A generator that yields OpenAgentStreamingResponse objects.
         """
         raise NotImplementedError
+    
+    @abstractmethod
+    def get_history(self) -> List[Dict[str, Any]]:
+        """
+        An abstract method to get the history of the conversation.
+
+        Returns:
+            List[Dict[str, Any]]: The history of the conversation.
+        """
+        raise NotImplementedError

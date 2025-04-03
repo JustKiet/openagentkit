@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, Union
 
 # TODO: NOT IMPLEMENTED YET. SHOULD BE USED IN THE FUTURE.
 class ToolCallFunction(BaseModel):
@@ -16,4 +16,4 @@ class ToolResponse(BaseModel):
     tool_calls: Optional[list[dict]] = None
     tool_results: Optional[list[dict]] = None
     tool_messages: Optional[list[dict]] = None
-    tool_notifications: Optional[list[str]] = None
+    tool_notifications: Optional[list[Union[str, None]]] = None
