@@ -42,15 +42,24 @@ class OpenAILLMService(BaseLLMModel):
     
     @property
     def history(self) -> List[Dict[str, Any]]:
+        """
+        Get the history of the conversation.
+
+        Returns:
+            The history of the conversation.
+        """
         return self._context_history
     
     # Property to access tools from the tool handler
     @property
     def tools(self):
+        """
+        Get the tools from the tool handler.
+
+        Returns:
+            The tools from the tool handler.
+        """
         return self._tool_handler.tools
-        
-    def define_system_message(self) -> str:
-        return self._system_message
     
     def _handle_client_request(self,
                               messages: List[Dict[str, str]],
@@ -60,6 +69,20 @@ class OpenAILLMService(BaseLLMModel):
                               max_tokens: Optional[int] = None,
                               top_p: Optional[float] = None,
                               **kwargs) -> OpenAgentResponse:
+        """
+        Handle the client request.
+
+        Args:
+            messages: The messages to send to the model.
+            tools: The tools to use in the response.
+            response_schema: The schema to use in the response.
+            temperature: The temperature to use in the response.
+            max_tokens: The max tokens to use in the response.
+            top_p: The top p to use in the response.
+
+        Returns:
+            An OpenAgentResponse object.
+        """
 
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
@@ -201,28 +224,6 @@ class OpenAILLMService(BaseLLMModel):
         response.tool_calls = tool_calls
         
         return response
-        
-    def add_context(self, content: dict[str, str]):
-        if not content:
-            return self._context_history
-        
-        self._context_history.append(content)
-        return self._context_history
-        
-    def extend_context(self, content: List[dict[str, str]]):
-        if not content:
-            return self._context_history
-        
-        self._context_history.extend(content)
-        return self._context_history
-    
-    # Delegate tool call handling to the tool handler
-    def _handle_tool_call(self, tool_name, **tool_args):
-        result = self._tool_handler._handle_tool_call(tool_name, **tool_args)
-        # Convert result to string if it's not already
-        if not isinstance(result, str):
-            return str(result)
-        return result
 
     def _handle_client_stream(self,
                               messages: List[Dict[str, str]],
@@ -232,7 +233,21 @@ class OpenAILLMService(BaseLLMModel):
                               max_tokens: Optional[int] = None,
                               top_p: Optional[float] = None,
                               **kwargs) -> Generator[OpenAgentStreamingResponse, None, None]:
-        
+        """
+        Handle the client stream.
+
+        Args:
+            messages: The messages to send to the model.
+            tools: The tools to use in the response.
+            response_schema: The schema to use in the response. **(not implemented yet)**
+            temperature: The temperature to use in the response.
+            max_tokens: The max tokens to use in the response.
+            top_p: The top p to use in the response.
+
+        Returns:
+            An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        """
+
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
             temperature = self._temperature
@@ -350,7 +365,20 @@ class OpenAILLMService(BaseLLMModel):
                      max_tokens: Optional[int] = None,
                      top_p: Optional[float] = None,
                      **kwargs) -> Generator[OpenAgentStreamingResponse, None, None]:
-        
+        """
+        Generate a response from the model.
+
+        Args:
+            messages: The messages to send to the model.
+            tools: The tools to use in the response.
+            response_schema: The schema to use in the response. **(not implemented yet)**
+            temperature: The temperature to use in the response.
+            max_tokens: The max tokens to use in the response.
+            top_p: The top p to use in the response.
+
+        Returns:
+            An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
             temperature = self._temperature
@@ -383,3 +411,53 @@ class OpenAILLMService(BaseLLMModel):
                 # Update the chunk with the parsed tool calls
                 chunk.tool_calls = tool_calls
             yield chunk
+
+    def add_context(self, content: dict[str, str]):
+        """
+        Add context to the model.
+
+        Args:
+            content: The content to add to the context.
+
+        Returns:
+            The context history.
+        """
+        if not content:
+            return self._context_history
+        
+        self._context_history.append(content)
+        return self._context_history
+        
+    def extend_context(self, content: List[dict[str, str]]):
+        """
+        Extend the context of the model.
+
+        Args:
+            content: The content to extend the context with.
+
+        Returns:
+            The context history.
+        """
+        if not content:
+            return self._context_history
+        
+        self._context_history.extend(content)
+        return self._context_history
+    
+    # Delegate tool call handling to the tool handler
+    def _handle_tool_call(self, tool_name, **tool_args):
+        """
+        Handle the tool call.
+
+        Args:
+            tool_name: The name of the tool to handle.
+            **tool_args: The arguments to pass to the tool.
+
+        Returns:
+            The result of the tool call.
+        """
+        result = self._tool_handler._handle_tool_call(tool_name, **tool_args)
+        # Convert result to string if it's not already
+        if not isinstance(result, str):
+            return str(result)
+        return result

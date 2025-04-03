@@ -68,10 +68,6 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             The tools from the tool handler.
         """
         return self._tool_handler.tools
-        
-    # NOTE: Why is this even needed?
-    async def define_system_message(self) -> str:
-        return self._system_message
     
     async def _handle_client_request(self,
                                      messages: List[Dict[str, str]],

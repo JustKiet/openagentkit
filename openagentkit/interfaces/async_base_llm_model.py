@@ -8,8 +8,6 @@ class AsyncBaseLLMModel(ABC):
     An abstract base class for LLM models.
 
     ## Methods:
-        `define_system_message()`: An abstract method to define the system message for the LLM model.
-
         `model_generate()`: An abstract method to generate a response from the LLM model.
 
         `model_stream()`: An abstract method to stream a response from the LLM model.
@@ -77,20 +75,6 @@ class AsyncBaseLLMModel(ABC):
         A setter for the maximum number of tokens property. (defaults to be None)
         """
         self._max_tokens = value
-
-    @abstractmethod
-    async def define_system_message(self,
-                                    system_message: Optional[str] = None) -> str:
-        """
-        An abstract method to define the system message for the LLM model.
-
-        Args:
-            system_message (Optional[str]): The system message to be defined.
-
-        Returns:
-            str: The defined system message.
-        """
-        raise NotImplementedError
     
     @abstractmethod
     async def model_generate(self,
@@ -99,7 +83,7 @@ class AsyncBaseLLMModel(ABC):
                              temperature: Optional[float] = None,
                              max_tokens: Optional[int] = None,
                              top_p: Optional[float] = None,
-                             **kwargs) -> Union[OpenAgentResponse, BaseModel]:
+                             **kwargs) -> OpenAgentResponse:
         """
         An abstract method to generate a response from the LLM model.
 
@@ -117,7 +101,7 @@ class AsyncBaseLLMModel(ABC):
             **kwargs: Additional keyword arguments.
 
         Returns:
-            Union[OpenAgentResponse, BaseModel]: The generated response.
+            OpenAgentResponse: The generated response.
         """
         raise NotImplementedError
     

@@ -12,8 +12,6 @@ class BaseLLMModel(ABC):
 
         `model_stream()`: An abstract method to stream a response from the LLM model.
 
-        `define_system_message()`: An abstract method to define the system message for the LLM model.
-
     ## Properties:
         `temperature`: A property to get and set the temperature for the response generation. (defaults to be the range of 0 to 2)
 
@@ -56,7 +54,7 @@ class BaseLLMModel(ABC):
     @temperature.setter
     def temperature(self, value: float) -> None:
         """
-        A setter for the temperature property.
+        A setter for the temperature property. (defaults to be the range of 0 to 2)
         """
         if value < 0 or value > 2:
             raise ValueError("Temperature must be between 0 and 2")
@@ -65,7 +63,7 @@ class BaseLLMModel(ABC):
     @top_p.setter
     def top_p(self, value: float) -> None:
         """
-        A setter for the top-p sampling parameter property.
+        A setter for the top-p sampling parameter property. (defaults to be the range of 0 to 1)
         """
         if value < 0 or value > 1:
             raise ValueError("Top P must be between 0 and 1")
@@ -88,6 +86,22 @@ class BaseLLMModel(ABC):
                        **kwargs) -> Union[OpenAgentResponse, BaseModel]:
         """
         An abstract method to generate a response from the LLM model.
+
+        Args:
+            messages (List[Dict[str, str]]): The messages to be processed.
+
+            response_schema (Optional[BaseModel]): The response schema to be used.
+
+            temperature (Optional[float]): The temperature for the response generation.
+
+            max_tokens (Optional[int]): The maximum number of tokens for the response.
+
+            top_p (Optional[float]): The top-p sampling parameter.
+
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Union[OpenAgentResponse, BaseModel]: The generated response.
         """
         raise NotImplementedError
     
@@ -101,12 +115,21 @@ class BaseLLMModel(ABC):
                      **kwargs) -> Generator[OpenAgentResponse, None, None]:
         """
         An abstract method to stream a response from the LLM model.
-        """
-        raise NotImplementedError
-    
-    @abstractmethod
-    def define_system_message(self, system_message: Optional[str]) -> str:
-        """
-        An abstract method to define the system message for the LLM model.
+        
+        Args:
+            messages (List[Dict[str, str]]): The messages to be processed.
+
+            response_schema (Optional[BaseModel]): The response schema to be used.
+
+            temperature (Optional[float]): The temperature for the response generation.
+
+            max_tokens (Optional[int]): The maximum number of tokens for the response.
+
+            top_p (Optional[float]): The top-p sampling parameter.
+
+            **kwargs: Additional keyword arguments.
+
+        Returns:
+            Generator[OpenAgentStreamingResponse, None]: The streamed response.
         """
         raise NotImplementedError
