@@ -19,7 +19,7 @@ setup(
     long_description_content_type='text/markdown',
     license='Apache-2.0',
     keywords='AI, agents, open-source, llm, tools, executors',
-    python_requires='>=3.12',
+    python_requires='>=3.11',
     url='https://github.com/JustKiet/openagentkit',
     project_urls={
         'Bug Reports': 'https://github.com/JustKiet/openagentkit/issues',

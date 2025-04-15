@@ -8,6 +8,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ## Features
 
 - **Unified LLM Interface**: Consistent API across multiple LLM providers
+- **Generator-based event stream**: Event-driven processing using a generator
 - **Async Support**: Built-in asynchronous processing for high-performance applications
 - **Tool Integration**: Pre-built tools for common agent tasks
 - **Extensible Architecture**: Easily add custom models, tools, and handlers
@@ -16,7 +17,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ## Installation
 
 ```bash
-pip install -i https://test.pypi.org/simple/ openagentkit==0.1.0.dev0
+pip install -i https://test.pypi.org/simple/ openagentkit==0.1.0.dev1
 ```
 
 ## Quick Start
@@ -36,6 +37,10 @@ import os
 def get_weather(city: Annotated[str, "The city to get the weather of"]) -> str: # Each argument must be of type Annotated
     """Get the weather of a city"""
 
+    # Actual implementation here...
+    # ...
+
+    # Define a response schema
     class WeatherResponse(BaseModel):
         city: str
         weather: str
@@ -184,6 +189,11 @@ from typing import Annotated
 def get_weather(city: Annotated[str, "The city to get the weather of"]) -> str: # Each argument must be of type Annotated
     """Get the weather of a city"""
 
+
+    # Actual implementation here...
+    # ...
+
+    # Define a response schema
     class WeatherResponse(BaseModel):
         city: str
         weather: str

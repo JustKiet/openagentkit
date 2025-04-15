@@ -175,3 +175,5 @@ cython_debug/
 
 # Test files
 tests/
+
+DEV_GUIDELINE.md
