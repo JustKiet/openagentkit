@@ -1,18 +1,25 @@
 from setuptools import setup, find_packages
 
+with open('requirements.txt') as f:
+    requirements = f.read().splitlines()
+
+with open('README.md', encoding='utf-8') as f:
+    long_description = f.read()
+
 setup(
     name='openagentkit',
     version='0.1.0.dev0',
     packages=find_packages(),
-    install_requires=open('requirements.txt').read().splitlines(),
+    install_requires=requirements,
+    include_package_data=True,
     author='Kiet Do',
     author_email='kietdohuu@gmail.com',
     description='An open-source framework for building and deploying AI agents.',
-    license="Apache-2.0",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
+    license='Apache-2.0',
     keywords='AI, agents, open-source, llm, tools, executors',
     python_requires='>=3.12',
-    long_description=open('README.md').read(),
-    long_description_content_type='text/markdown',
     url='https://github.com/JustKiet/openagentkit',
     project_urls={
         'Bug Reports': 'https://github.com/JustKiet/openagentkit/issues',
