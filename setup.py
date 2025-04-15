@@ -8,7 +8,7 @@ with open('README.md', encoding='utf-8') as f:
 
 setup(
     name='openagentkit',
-    version='0.1.0.dev2',
+    version='0.1.0.dev3',
     packages=find_packages(),
     install_requires=requirements,
     include_package_data=True,
