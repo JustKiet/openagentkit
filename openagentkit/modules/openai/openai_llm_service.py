@@ -71,6 +71,24 @@ class OpenAILLMService(BaseLLMModel):
         """
         return self._tool_handler.tools
     
+    def clone(self) -> 'OpenAILLMService':
+        """
+        Clone the LLM model instance.
+
+        Returns:
+            A clone of the LLM model instance.
+        """
+        return OpenAILLMService(
+            client=self._client,
+            model=self._model,
+            system_message=self._system_message,
+            tools=self.tools,
+            api_key=self._api_key,
+            temperature=self._temperature,
+            max_tokens=self._max_tokens,
+            top_p=self._top_p,
+        )
+    
     def _handle_client_request(self,
                               messages: List[Dict[str, str]],
                               tools: Optional[List[Dict[str, Any]]],
@@ -321,6 +339,7 @@ class OpenAILLMService(BaseLLMModel):
             
             # After the stream is done, yield the final response with usage info if available
             if final_chunk and hasattr(final_chunk, 'usage'):
+                print(f"Final chunk usage: {list(final_tool_calls.values())}")
                 yield OpenAgentStreamingResponse(
                     role="assistant",
                     content=final_content,

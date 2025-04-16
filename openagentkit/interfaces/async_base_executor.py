@@ -17,6 +17,17 @@ class AsyncBaseExecutor(ABC):
 
         `stream_execute()`: An abstract method to stream execute a user message with the given tools and parameters.
     """
+
+    @abstractmethod
+    def clone(self) -> 'AsyncBaseExecutor':
+        """
+        An abstract method to clone the executor instance.
+        
+        Returns:
+            AsyncBaseExecutor: A clone of the executor instance.
+        """
+        raise NotImplementedError
+
     @abstractmethod
     async def define_system_message(self, system_message: Optional[str]) -> str:
         """

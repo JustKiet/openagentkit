@@ -75,6 +75,16 @@ class AsyncBaseLLMModel(ABC):
         A setter for the maximum number of tokens property. (defaults to be None)
         """
         self._max_tokens = value
+
+    @abstractmethod
+    def clone(self) -> 'AsyncBaseLLMModel':
+        """
+        An abstract method to clone the LLM model instance.
+        
+        Returns:
+            AsyncBaseLLMModel: A clone of the LLM model instance.
+        """
+        raise NotImplementedError
     
     @abstractmethod
     async def model_generate(self,

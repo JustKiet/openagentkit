@@ -14,107 +14,58 @@ class AudioUtility:
         :return: String indicating the detected format
         """
         if len(audio_bytes) < 12:
-            logger.warning("Audio data too short to determine format")
             return "unknown"
         
-        # Enhanced WebM detection (common format from browser recording)
-        # WebM signature varies - look for EBML header or matroska markers
-        if (audio_bytes.startswith(b'\x1A\x45\xDF\xA3') or  # Primary WebM signature
-            b'\x42\x82\x84webm' in audio_bytes[:50] or      # Look for 'webm' marker
-            b'\x1A\x45\xDF\xA3\x01\x00\x00\x00' in audio_bytes[:50]):  # Alternative signature
-            logger.info("Detected WebM format (enhanced detection)")
+        # Define signature patterns for quick lookup
+        format_signatures = {
+            "wav": [(b'RIFF', 0, 4), (b'WAVE', 8, 12)],
+            "webm": [(b'\x1A\x45\xDF\xA3', 0, 4)],
+            "mp3": [(b'\xFF\xFB', 0, 2), (b'\xFF\xF3', 0, 2), (b'\xFF\xF2', 0, 2), (b'\x49\x44\x33', 0, 3)],
+            "ogg": [(b'OggS', 0, 4)],
+            "flac": [(b'fLaC', 0, 4)],
+            "aac": [(b'\xFF\xF1', 0, 2), (b'\xFF\xF9', 0, 2)],
+            "aiff": [(b'FORM', 0, 4), (b'AIFF', 8, 12)],
+            "mpeg": [(b'\x00\x00\x01\xBA', 0, 4), (b'\x00\x00\x01\xB3', 0, 4)],
+        }
+        
+        # Check common formats using signature lookup
+        for fmt, signatures in format_signatures.items():
+            for sig, start, end in signatures:
+                if start + len(sig) <= len(audio_bytes) and audio_bytes[start:end].startswith(sig):
+                    if fmt == "wav" and not any(s[0] == b'WAVE' for s in signatures) or fmt != "wav":
+                        return fmt
+        
+        # Additional checks for formats that need special handling
+        # WebM - check for additional signatures if primary one didn't match
+        if (b'\x42\x82\x84webm' in audio_bytes[:50] or 
+            b'\x1A\x45\xDF\xA3\x01\x00\x00\x00' in audio_bytes[:50] or
+            b'audio/webm' in audio_bytes[:1000]):
             return "webm"
             
-        # Check for WAV (RIFF header)
-        if audio_bytes.startswith(b'RIFF') and b'WAVE' in audio_bytes[0:12]:
-            logger.info("Detected WAV format")
-            return "wav"
-            
-        # Check for MP3
-        if (audio_bytes.startswith(b'\xFF\xFB') or 
-            audio_bytes.startswith(b'\xFF\xF3') or 
-            audio_bytes.startswith(b'\xFF\xF2') or 
-            audio_bytes.startswith(b'\x49\x44\x33')):  # ID3 tag
-            logger.info("Detected MP3 format")
-            return "mp3"
-            
-        # Check for Ogg Vorbis
-        if audio_bytes.startswith(b'OggS'):
-            logger.info("Detected Ogg format")
-            return "ogg"
-            
-        # Check for FLAC
-        if audio_bytes.startswith(b'fLaC'):
-            logger.info("Detected FLAC format")
-            return "flac"
-            
-        # Check for AAC
-        if (audio_bytes.startswith(b'\xFF\xF1') or 
-            audio_bytes.startswith(b'\xFF\xF9') or
-            b'ftypM4A' in audio_bytes[:20]):  # M4A container with AAC
-            logger.info("Detected AAC format")
-            return "aac"
-            
-        # Check for AIFF
-        if audio_bytes.startswith(b'FORM') and b'AIFF' in audio_bytes[0:12]:
-            logger.info("Detected AIFF format")
-            return "aiff"
-            
-        # Check for M4A (MPEG-4 Audio)
-        if (audio_bytes.startswith(b'\x00\x00\x00\x20\x66\x74\x79\x70\x4D\x34\x41') or 
-            audio_bytes.startswith(b'\x00\x00\x00\x18\x66\x74\x79\x70\x6D\x70\x34\x32') or
-            b'ftypM4A' in audio_bytes[:20]):
-            logger.info("Detected M4A format")
+        # M4A/AAC detection
+        if b'ftypM4A' in audio_bytes[:20]:
             return "m4a"
             
-        # Check for MPEG
-        if (audio_bytes.startswith(b'\x00\x00\x01\xBA') or 
-            audio_bytes.startswith(b'\x00\x00\x01\xB3')):
-            logger.info("Detected MPEG format")
-            return "mpeg"
-            
-        # Check for MPGA (MPEG-1 Layer 3)
+        # MPGA check
         if len(audio_bytes) > 2 and (audio_bytes[0] == 0xFF and (audio_bytes[1] & 0xE0) == 0xE0):
-            logger.info("Detected MPGA format")
             return "mpga"
         
-        # Browser-recorded blob may have custom formats or headers
-        # Look for common browser-specific markers
-        if b'audio/webm' in audio_bytes[:1000]:
-            logger.info("Detected WebM format (browser metadata)")
-            return "webm"
-            
+        # WAV metadata in browser recording
         if b'audio/wav' in audio_bytes[:1000] or b'audio/x-wav' in audio_bytes[:1000]:
-            logger.info("Detected WAV format (browser metadata)")
             return "wav"
             
-        # If no known signatures match, try to determine if it's raw PCM
-        try:
-            # Check if data looks like 16-bit PCM (reasonable amplitude values)
-            if len(audio_bytes) >= 1000:  # Need a reasonable amount of data
-                # Sample a few values
-                samples = []
-                for i in range(0, min(1000, len(audio_bytes) - 1), 2):
-                    if i + 1 < len(audio_bytes):
-                        sample = struct.unpack('<h', audio_bytes[i:i+2])[0]
-                        samples.append(abs(sample))
+        # PCM detection - only do this if other formats don't match
+        if len(audio_bytes) >= 1000:
+            try:
+                # Sample fewer values for speed
+                samples = [abs(struct.unpack('<h', audio_bytes[i:i+2])[0]) 
+                          for i in range(0, 1000, 40) if i+1 < len(audio_bytes)]
                 
-                # Check if values are within reasonable range for audio
-                avg = sum(samples) / len(samples)
-                if 0 < avg < 32768:  # 16-bit audio range
-                    logger.info("Detected likely raw PCM data")
+                if samples and 0 < sum(samples)/len(samples) < 32768:
                     return "pcm"
-        except Exception as e:
-            logger.error(f"Error checking for PCM: {e}")
+            except:
+                pass
         
-        # Dump initial bytes for debugging unknown formats
-        try:
-            hex_dump = ' '.join([f'{b:02x}' for b in audio_bytes[:32]])
-            logger.warning(f"Unknown format - first 32 bytes: {hex_dump}")
-        except Exception as e:
-            logger.error(f"Error creating hex dump: {e}")
-            
-        logger.warning("Unknown audio format")
         return "unknown"
     
     @staticmethod

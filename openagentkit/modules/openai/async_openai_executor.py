@@ -75,6 +75,24 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
     @property
     def top_p(self) -> float:
         return self._llm_service.top_p
+    
+    def clone(self) -> 'AsyncOpenAIExecutor':
+        """
+        Clone the AsyncOpenAIExecutor object.
+
+        Returns:
+            A new AsyncOpenAIExecutor object with the same parameters.
+        """
+        return AsyncOpenAIExecutor(
+            client=self._llm_service.client,
+            model=self._llm_service.model,
+            system_message=self._llm_service.system_message,
+            tools=self._llm_service.tools,
+            api_key=self._llm_service.api_key,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            top_p=self.top_p,
+        )
 
     def get_history(self) -> List[Dict[str, Any]]:
         return self._llm_service.history

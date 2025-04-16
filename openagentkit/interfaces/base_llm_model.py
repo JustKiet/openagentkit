@@ -77,6 +77,16 @@ class BaseLLMModel(ABC):
         self._max_tokens = value
 
     @abstractmethod
+    def clone(self) -> 'BaseLLMModel':
+        """
+        An abstract method to clone the LLM model instance.
+        
+        Returns:
+            BaseLLMModel: A clone of the LLM model instance.
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def model_generate(self,
                        messages: List[Dict[str, str]],
                        response_schema: Optional[BaseModel] = None,

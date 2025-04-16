@@ -8,6 +8,9 @@ class OpenAIRealtimeExecutor(AsyncBaseExecutor):
     def __init__(self, client: AsyncOpenAI):
         self.client = client
 
+    def clone(self) -> 'OpenAIRealtimeExecutor':
+        return OpenAIRealtimeExecutor(self.client)
+
     async def define_system_message(self, system_message: Optional[str]) -> str:
         return system_message
 

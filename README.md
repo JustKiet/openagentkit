@@ -19,7 +19,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ```bash
 pip install -i https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple \
-            openagentkit==0.1.0.dev7
+            openagentkit==0.1.0.dev8
 ```
 
 ## Quick Start
@@ -36,7 +36,7 @@ import os
 @tool(
     description="Get the weather of a city", # Define the tool description
 )
-def get_weather(city: Annotated[str, "The city to get the weather of"]) -> str: # Each argument must be of type Annotated
+def get_weather(city: Annotated[str, "The city to get the weather of"]): # Each argument must be of type Annotated
     """Get the weather of a city"""
 
     # Actual implementation here...
@@ -127,7 +127,7 @@ import os
 @tool(
     description="Get the weather of a city",
 )
-def get_weather(city: Annotated[str, "The city to get the weather of"]) -> str:
+def get_weather(city: Annotated[str, "The city to get the weather of"]):
     """Get the weather of a city"""
 
     class WeatherResponse(BaseModel):

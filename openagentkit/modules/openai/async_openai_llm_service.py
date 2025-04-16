@@ -9,7 +9,7 @@ from openagentkit.models.responses import (
     OpenAgentResponse, 
     UsageResponse, 
     PromptTokensDetails, 
-    CompletionTokensDetails
+    CompletionTokensDetails, 
 )
 from typing import AsyncGenerator
 import asyncio
@@ -78,6 +78,24 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             The tools from the tool handler.
         """
         return self._tool_handler.tools
+    
+    def clone(self) -> 'AsyncOpenAILLMService':
+        """
+        Clone the LLM model instance.
+
+        Returns:
+            A clone of the LLM model instance.
+        """
+        return AsyncOpenAILLMService(
+            client=self._client,
+            model=self._model,
+            system_message=self._system_message,
+            tools=self._tool_handler.tools,
+            api_key=self._api_key,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            top_p=self.top_p
+        )
     
     async def _handle_client_request(self,
                                      messages: List[Dict[str, str]],

@@ -8,6 +8,7 @@ from openagentkit.models.payloads.realtime_payload import (
     RealtimeClientPayload,
 )
 from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from openagentkit.models.responses import UsageResponse, PromptTokensDetails, CompletionTokensDetails
 from openagentkit.interfaces import AsyncBaseLLMModel
 
 import os
@@ -44,6 +45,19 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
         self._response_queue = asyncio.Queue()
         self._is_connected = False
 
+    def clone(self) -> 'OpenAIRealtimeService':
+        return OpenAIRealtimeService(
+            client=self._client,
+            model=self._model,
+            voice=self._voice,
+            system_message=self._system_message,
+            tools=self._tools,
+            api_key=self._api_key,
+            temperature=self._temperature,
+            max_tokens=self._max_tokens,
+            top_p=self._top_p
+        )
+
     def _handle_session_event(self, event: RealtimeServerEvent):
         """Handle session-related events"""
         if not event.type.split(".")[0] == "session":
@@ -70,7 +84,6 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 logger.info(f"{event}")
             case "conversation.item.input_audio_transcription.completed":
                 logger.info(f"{event}")
-                return event.transcript
             case "conversation.item.input_audio_transcription.delta":
                 logger.info(f"{event}")
             case "conversation.item.input_audio_transcription.failed":
@@ -97,12 +110,69 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
     def _handle_response_event(self, event: RealtimeServerEvent):
         if not event.type.split(".")[0] == "response":
             raise ValueError("Can only handle 'response.*' events!")
-        
+
         match event.type:
             case "response.created":
                 logger.info(f"{event}")
             case "response.done":
                 logger.info(f"{event}")
+                if event.response.output[0].type == "message":
+                    return OpenAgentStreamingResponse(
+                        role="assistant",
+                        content=event.response.output[0].content[0].text,
+                        finish_reason="stop",
+                        usage=UsageResponse(
+                            prompt_tokens=event.response.usage.input_tokens,
+                            completion_tokens=event.response.usage.output_tokens,
+                            total_tokens=event.response.usage.total_tokens,
+                            prompt_tokens_details=PromptTokensDetails(
+                                cached_tokens=event.response.usage.input_token_details.cached_tokens,
+                                audio_tokens=event.response.usage.input_token_details.audio_tokens,
+                            ), 
+                            completion_tokens_details=CompletionTokensDetails(
+                                audio_tokens=event.response.usage.output_token_details.audio_tokens, # TODO: This is missing a bunch of fields
+                                reasoning_tokens=0,
+                                accepted_prediction_tokens=0,
+                                rejected_prediction_tokens=0, # TODO: This is missing a bunch of fields
+                            )
+                        )
+                    )
+                
+                tool_calls = []
+                for i in range(len(event.response.output)):
+                    if event.response.output[i].type == "function_call":
+                        tool_calls.append(
+                            {
+                                "id": event.response.output[i].id,
+                                "type": "function_call",
+                                "function_call": {
+                                    "name": event.response.output[i].function.name,
+                                    "arguments": event.response.output[i].function.arguments,
+                                }
+                            }
+                        )
+
+                return OpenAgentStreamingResponse(
+                    role="assistant",
+                    content="",
+                    tool_calls=tool_calls,
+                    finish_reason="tool_calls",
+                    usage=UsageResponse(
+                        prompt_tokens=event.response.usage.input_tokens,
+                        completion_tokens=event.response.usage.output_tokens,
+                        total_tokens=event.response.usage.total_tokens,
+                        prompt_tokens_details=PromptTokensDetails(
+                            cached_tokens=event.response.usage.input_token_details.cached_tokens,
+                            audio_tokens=event.response.usage.input_token_details.audio_tokens,
+                        ), 
+                        completion_tokens_details=CompletionTokensDetails(
+                            audio_tokens=event.response.usage.output_token_details.audio_tokens,
+                            reasoning_tokens=0,
+                            accepted_prediction_tokens=0,
+                            rejected_prediction_tokens=0, # TODO: This is missing a bunch of fields
+                        )   
+                    )
+                )
             case "response.output_item.added":
                 logger.info(f"{event}")
             case "response.output_item.done":
@@ -116,20 +186,30 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             case "response.text.done":
                 logger.info(f"{event}")
             case "response.audio_transcript.delta":
-                return event.delta
+                logger.info(f"{event}")
+                return OpenAgentStreamingResponse(
+                    role="assistant",
+                    index=event.content_index,
+                    delta_content=event.delta,    
+                )
             case "response.audio_transcript.done":
-                return event.transcript
-            case "response.audio.delta":
-                return event.delta
-            case "response.audio.done":
                 logger.info(f"{event}")
+                return OpenAgentStreamingResponse(
+                    role="assistant",
+                    content=event.transcript,    
+                )
             case "response.audio.delta":
                 logger.info(f"{event}")
+                return OpenAgentStreamingResponse(
+                    role="assistant",
+                    index=event.content_index,
+                    delta_content=event.delta,    
+                )
             case "response.audio.done":
                 logger.info(f"{event}")
             case "response.function_call_arguments.delta":
                 logger.info(f"{event}")
-            case "response.audio_transcript.done":
+            case "response.function_call_arguments.done":
                 logger.info(f"{event}")
 
     def _handle_error_event(self, event: RealtimeServerEvent):
