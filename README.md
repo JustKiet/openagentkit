@@ -19,7 +19,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ```bash
 pip install -i https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple \
-            openagentkit==0.1.0.dev11
+            openagentkit==0.1.0.dev12
 ```
 
 ## Quick Start
@@ -42,21 +42,7 @@ def get_weather(city: Annotated[str, "The city to get the weather of"]): # Each 
     # Actual implementation here...
     # ...
 
-    # Define a response schema
-    class WeatherResponse(BaseModel):
-        city: str
-        weather: str
-        temperature: float
-        feels_like: float
-        humidity: float
-
-    return WeatherResponse( # The Response must be a pydantic model
-        city=city,
-        weather="sunny",
-        temperature=20,
-        feels_like=22,
-        humidity=0.5,
-    )
+    return f"Weather in {city}: sunny, 20°C, feels like 22°C, humidity: 50%"
 
 # Initialize OpenAI client
 client = openai.OpenAI(
@@ -125,25 +111,15 @@ import os
 
 # Define a tool
 @tool(
-    description="Get the weather of a city",
+    description="Get the weather of a city", # Define the tool description
 )
-def get_weather(city: Annotated[str, "The city to get the weather of"]):
+def get_weather(city: Annotated[str, "The city to get the weather of"]): # Each argument must be of type Annotated
     """Get the weather of a city"""
 
-    class WeatherResponse(BaseModel):
-        city: str
-        weather: str
-        temperature: float
-        feels_like: float
-        humidity: float
+    # Actual implementation here...
+    # ...
 
-    return WeatherResponse(
-        city=city,
-        weather="sunny",
-        temperature=20,
-        feels_like=22,
-        humidity=0.5,
-    )
+    return f"Weather in {city}: sunny, 20°C, feels like 22°C, humidity: 50%"
 
 # Initialize OpenAI client
 client = openai.AsyncOpenAI(
@@ -185,31 +161,17 @@ from openagentkit.core.utils.tool_wrapper import tool
 from pydantic import BaseModel
 from typing import Annotated
 
+# Define a tool
 @tool(
     description="Get the weather of a city", # Define the tool description
 )
-def get_weather(city: Annotated[str, "The city to get the weather of"]) -> str: # Each argument must be of type Annotated
+def get_weather(city: Annotated[str, "The city to get the weather of"]): # Each argument must be of type Annotated
     """Get the weather of a city"""
-
 
     # Actual implementation here...
     # ...
 
-    # Define a response schema
-    class WeatherResponse(BaseModel):
-        city: str
-        weather: str
-        temperature: float
-        feels_like: float
-        humidity: float
-
-    return WeatherResponse( # The Response must be a pydantic model
-        city=city,
-        weather="sunny",
-        temperature=20,
-        feels_like=22,
-        humidity=0.5,
-    )
+    return f"Weather in {city}: sunny, 20°C, feels like 22°C, humidity: 50%"
 
 # Get the tool schema
 print(get_weather.schema)

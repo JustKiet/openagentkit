@@ -117,7 +117,7 @@ class ToolHandler:
                 logger.info(f"Tool Notification: {tool_notification}")
                 return OpenAgentStreamingResponse(
                     role="assistant",
-                    content="",
+                    content=None,
                     tool_notification=tool_notification,
                 )
             

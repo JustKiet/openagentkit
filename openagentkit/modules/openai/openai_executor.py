@@ -186,7 +186,7 @@ class OpenAIExecutor(BaseExecutor):
 
                 yield OpenAgentResponse(
                     role=response.role,
-                    content=str(response.content) if not isinstance(response.content, BaseModel) else response.content,
+                    content=str(response.content) if not isinstance(response.content, (BaseModel, type(None))) else response.content,
                     tool_calls=response.tool_calls,
                     refusal=response.refusal,
                     usage=response.usage,
@@ -232,7 +232,7 @@ class OpenAIExecutor(BaseExecutor):
                 
                 yield OpenAgentResponse(
                     role=response.role,
-                    content=str(response.content) if not isinstance(response.content, BaseModel) else response.content,
+                    content=str(response.content) if not isinstance(response.content, (BaseModel, type(None))) else response.content,
                     tool_calls=response.tool_calls,
                     tool_results=tool_results,
                     refusal=response.refusal,
@@ -311,7 +311,7 @@ class OpenAIExecutor(BaseExecutor):
 
                     yield OpenAgentStreamingResponse(
                         role=chunk.role,
-                        content=str(chunk.content) if not isinstance(chunk.content, BaseModel) else chunk.content,
+                        content=str(chunk.content) if not isinstance(chunk.content, (BaseModel, type(None))) else chunk.content,
                         tool_calls=chunk.tool_calls,
                         usage=chunk.usage,
                     )

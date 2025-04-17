@@ -317,7 +317,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             if final_chunk and hasattr(final_chunk, 'usage') and final_chunk.usage is not None:
                 yield OpenAgentStreamingResponse(
                     role="assistant",
-                    content=final_content,
+                    content=final_content if final_content else None,
                     finish_reason="tool_calls" if final_tool_calls else "stop",
                     tool_calls=list(final_tool_calls.values()),
                     usage=UsageResponse(
