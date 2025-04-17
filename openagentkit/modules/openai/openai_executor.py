@@ -199,10 +199,7 @@ class OpenAIExecutor(BaseExecutor):
 
                 yield OpenAgentResponse(
                     role="tool",
-                    content=str(response.content) if not isinstance(response.content, BaseModel) else response.content,
                     tool_results=tool_response.tool_results,
-                    refusal=response.refusal,
-                    usage=response.usage,
                 )
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
@@ -334,7 +331,6 @@ class OpenAIExecutor(BaseExecutor):
 
                     yield OpenAgentStreamingResponse(
                         role="tool",
-                        content=str(chunk.content) if not isinstance(chunk.content, BaseModel) else chunk.content,
                         tool_results=tool_response.tool_results,
                     )
 

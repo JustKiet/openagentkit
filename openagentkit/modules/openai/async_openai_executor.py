@@ -231,7 +231,6 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                 yield OpenAgentResponse(
                     role="tool",
-                    content=str(response.content) if not isinstance(response.content, BaseModel) else response.content,
                     tool_results=tool_response.tool_results,
                 )
 
@@ -389,7 +388,6 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                     yield OpenAgentStreamingResponse(
                         role="tool",
-                        content=str(chunk.content) if not isinstance(chunk.content, BaseModel) else chunk.content,
                         tool_results=tool_response.tool_results,
                     )
 
