@@ -1,8 +1,8 @@
 from typing import Annotated, Union, Literal, Optional
-from openagentkit.utils.tool_wrapper import tool
+from openagentkit.core.utils.tool_wrapper import tool
 import os
 import requests
-from openagentkit.models.tool_responses import WeatherForecast, CurrentWeather, WeatherResponse
+from openagentkit.core.models.tool_responses import WeatherForecast, CurrentWeather, WeatherResponse
 import logging
 from functools import lru_cache
 import time

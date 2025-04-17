@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from openagentkit.models.responses import OpenAgentResponse
+from openagentkit.core.models.responses import OpenAgentResponse
 from pydantic import BaseModel
 from typing import Union, Optional, Generator, List, Dict, Any
 

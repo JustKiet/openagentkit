@@ -1,6 +1,6 @@
-from openagentkit.interfaces import AsyncBaseExecutor
+from openagentkit.core.interfaces import AsyncBaseExecutor
 from typing import Optional, List, Dict, Any, AsyncGenerator
-from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 import websockets
 from openai import AsyncOpenAI, AsyncAzureOpenAI
 

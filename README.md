@@ -19,14 +19,14 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ```bash
 pip install -i https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple \
-            openagentkit==0.1.0.dev8
+            openagentkit==0.1.0.dev9
 ```
 
 ## Quick Start
 
 ```python
 from openagentkit.modules.openai import OpenAIExecutor
-from openagentkit.utils.tool_wrapper import tool
+from openagentkit.core.utils.tool_wrapper import tool
 from pydantic import BaseModel
 from typing import Annotated
 import openai
@@ -116,7 +116,7 @@ OpenAgentKit is built with a modular architecture:
 
 ```python
 from openagentkit.modules.openai import AsyncOpenAIExecutor
-from openagentkit.utils.tool_wrapper import tool
+from openagentkit.core.utils.tool_wrapper import tool
 from pydantic import BaseModel
 from typing import Annotated
 import asyncio
@@ -181,7 +181,7 @@ if __name__ == "__main__":
 ### Custom Tool Integration
 
 ```python
-from openagentkit.utils.tool_wrapper import tool
+from openagentkit.core.utils.tool_wrapper import tool
 from pydantic import BaseModel
 from typing import Annotated
 

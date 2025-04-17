@@ -4,7 +4,7 @@ from typing import Optional, Union
 # TODO: NOT IMPLEMENTED YET. SHOULD BE USED IN THE FUTURE.
 class ToolCallFunction(BaseModel):
     name: str
-    arguments: str
+    arguments: Union[str, dict]
 
 class ToolCallResponse(BaseModel):
     id: str

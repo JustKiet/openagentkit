@@ -3,10 +3,10 @@ import os
 from loguru import logger
 from openai._types import NOT_GIVEN
 from openai import OpenAI
-from openagentkit.interfaces.base_executor import BaseExecutor
+from openagentkit.core.interfaces.base_executor import BaseExecutor
 from openagentkit.modules.openai import OpenAILLMService
-from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.handlers.tool_handler import ToolHandler
+from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from openagentkit.core.handlers.tool_handler import ToolHandler
 from pydantic import BaseModel
 import json
 import datetime
@@ -138,13 +138,15 @@ class OpenAIExecutor(BaseExecutor):
         top_p = kwargs.get("top_p", top_p)
         if top_p is None:
             top_p = self.top_p
+
+        debug = kwargs.get("debug", False)
         
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
         
         context = self._llm_service.extend_context(messages)
         
-        logger.debug(f"Context: {context}")
+        logger.debug(f"Context: {context}") if debug else None
 
         stop = False
 
@@ -186,11 +188,11 @@ class OpenAIExecutor(BaseExecutor):
                     response=response,
                 )
 
-                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
+                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
                 context = self._llm_service.extend_context(tool_response.tool_messages)
 
-                logger.debug(f"Context: {context}")
+                logger.debug(f"Context: {context}") if debug else None
             else:
                 stop = True
 
@@ -259,6 +261,8 @@ class OpenAIExecutor(BaseExecutor):
         top_p = kwargs.get("top_p", top_p)
         if top_p is None:
             top_p = self.top_p
+
+        debug = kwargs.get("debug", False)
         
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
@@ -269,7 +273,7 @@ class OpenAIExecutor(BaseExecutor):
 
         while not stop:
 
-            logger.debug(f"Context: {context}")
+            logger.debug(f"Context: {context}") if debug else None
 
             response_generator = self._llm_service.model_stream(
                 messages=context,
@@ -291,7 +295,7 @@ class OpenAIExecutor(BaseExecutor):
                         }
                     )
 
-                    logger.debug(f"Context: {context}")
+                    logger.debug(f"Context: {context}") if debug else None
 
                     notification = self._tool_handler.handle_notification(chunk)
 
@@ -304,11 +308,11 @@ class OpenAIExecutor(BaseExecutor):
                         response=chunk,
                     )
 
-                    logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
+                    logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
                     
                     context = self._llm_service.extend_context(tool_response.tool_messages)
                     
-                    logger.debug(f"Context in Stream Execute: {context}")
+                    logger.debug(f"Context in Stream Execute: {context}") if debug else None
 
                 elif chunk.finish_reason == "stop":
                     if chunk.content:
@@ -318,7 +322,7 @@ class OpenAIExecutor(BaseExecutor):
                                 "content": str(chunk.content),
                             }
                         )
-                        logger.info(f"Context: {context}")
+                        logger.debug(f"Context: {context}") if debug else None
                         yield chunk
                         stop = True
                 else:

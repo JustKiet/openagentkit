@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from openagentkit.models.responses.usage_responses import UsageResponse
+from openagentkit.core.models.responses.usage_responses import UsageResponse
 from typing import Optional, List, Dict, Any, Union
 
 class OpenAgentResponse(BaseModel):

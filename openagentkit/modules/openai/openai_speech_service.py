@@ -1,6 +1,6 @@
 from typing import Optional, Literal, AsyncGenerator, Union
-from openagentkit.interfaces import BaseSpeechModel
-from openagentkit._types import NamedBytesIO
+from openagentkit.core.interfaces import BaseSpeechModel
+from openagentkit.core._types import NamedBytesIO
 from openai import AsyncOpenAI, OpenAI
 import wave
 from loguru import logger
@@ -8,7 +8,7 @@ import tempfile
 import os
 import io
 
-from openagentkit.utils.audio_utils import AudioUtility
+from openagentkit.core.utils.audio_utils import AudioUtility
 
 class OpenAISpeechService(BaseSpeechModel):
     def __init__(self,

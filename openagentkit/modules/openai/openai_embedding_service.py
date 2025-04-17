@@ -1,9 +1,9 @@
 import tiktoken
 from openai import OpenAI
 from openai.types import CreateEmbeddingResponse
-from openagentkit.interfaces.base_embedding_model import BaseEmbeddingModel
-from openagentkit.models.responses.embedding_response import EmbeddingResponse, EmbeddingUnit
-from openagentkit.models.responses.usage_responses import EmbeddingUsageResponse
+from openagentkit.core.interfaces.base_embedding_model import BaseEmbeddingModel
+from openagentkit.core.models.responses.embedding_response import EmbeddingResponse, EmbeddingUnit
+from openagentkit.core.models.responses.usage_responses import EmbeddingUsageResponse
 from typing import Literal, Union
 
 class OpenAIEmbeddingModel(BaseEmbeddingModel):

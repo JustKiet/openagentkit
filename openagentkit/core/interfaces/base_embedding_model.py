@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from openagentkit.models.responses.embedding_response import EmbeddingResponse
+from openagentkit.core.models.responses.embedding_response import EmbeddingResponse
 
 class BaseEmbeddingModel(ABC):
     """

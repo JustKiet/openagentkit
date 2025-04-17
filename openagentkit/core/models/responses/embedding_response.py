@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from openagentkit.models.responses.usage_responses import EmbeddingUsageResponse
+from openagentkit.core.models.responses.usage_responses import EmbeddingUsageResponse
 
 class EmbeddingUnit(BaseModel):
     """

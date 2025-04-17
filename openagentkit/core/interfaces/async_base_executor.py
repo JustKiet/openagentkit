@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from typing import Optional, AsyncGenerator, List, Dict, Any
 
 class AsyncBaseExecutor(ABC):

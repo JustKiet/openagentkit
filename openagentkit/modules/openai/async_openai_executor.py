@@ -3,10 +3,10 @@ import os
 from loguru import logger
 from openai._types import NOT_GIVEN
 from openai import AsyncOpenAI
-from openagentkit.interfaces.async_base_executor import AsyncBaseExecutor
+from openagentkit.core.interfaces.async_base_executor import AsyncBaseExecutor
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
-from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.handlers.tool_handler import ToolHandler
+from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from openagentkit.core.handlers.tool_handler import ToolHandler
 from pydantic import BaseModel
 import json
 import datetime
@@ -176,7 +176,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         if tools == NOT_GIVEN:
             tools = self._llm_service.tools
         
-        context = await self._llm_service.extend_context(messages)
+        context = self._llm_service.extend_context(messages)
         
         logger.debug(f"Context: {context}") if debug else None
         
@@ -184,7 +184,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         
         while not stop:
             # Take user intial request along with the chat history -> response
-            response = await self._llm_service.model_generate(
+            response = self._llm_service.model_generate(
                 messages=context, 
                 tools=tools, 
                 response_schema=response_schema,
@@ -197,7 +197,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
             if response.content is not None:
                 # Add the response to the context (chat history)
-                context = await self._llm_service.add_context(
+                context = self._llm_service.add_context(
                     {
                         "role": response.role,
                         "content": str(response.content),
@@ -208,7 +208,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             
             if response.tool_calls:
                 # Add the tool call request to the context
-                context = await self._llm_service.add_context(
+                context = self._llm_service.add_context(
                     {
                         "role": response.role,
                         "tool_calls": response.tool_calls,
@@ -222,7 +222,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                context = await self._llm_service.extend_context(tool_response.tool_messages)
+                context = self._llm_service.extend_context(tool_response.tool_messages)
 
                 logger.debug(f"Context: {context}") if debug else None
             
@@ -231,7 +231,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             
             if response.content is not None:
                 # Add the final response to the context (chat history)
-                await self._llm_service.add_context(
+                self._llm_service.add_context(
                     {
                         "role": response.role,
                         "content": str(response.content),
@@ -323,7 +323,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
         stop = False
 
-        context = await self._llm_service.extend_context(messages)
+        context = self._llm_service.extend_context(messages)
 
         while not stop:
             logger.debug(f"Context: {context}") if debug else None
@@ -343,7 +343,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             async for chunk in response_generator:
                 if chunk.finish_reason == "tool_calls":
                     # Add the llm tool call request to the context
-                    context = await self._llm_service.add_context(
+                    context = self._llm_service.add_context(
                         {
                             "role": "assistant",
                             "tool_calls": chunk.tool_calls,
@@ -367,14 +367,14 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                     logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                    context = await self._llm_service.extend_context(tool_response.tool_messages)
+                    context = self._llm_service.extend_context(tool_response.tool_messages)
                     
                     logger.debug(f"Context in Stream Execute: {context}") if debug else None
 
                 elif chunk.finish_reason == "stop":
                     logger.debug(f"Final Chunk: {chunk}") if debug else None
                     if chunk.content:
-                        context = await self._llm_service.add_context(
+                        context = self._llm_service.add_context(
                             {
                                 "role": "assistant",
                                 "content": str(chunk.content),

@@ -2,14 +2,14 @@ from openai import AsyncOpenAI, AsyncAzureOpenAI
 from typing import List, Dict, Any, Optional, AsyncGenerator
 from openai.types.beta.realtime import *
 
-from openagentkit.models.payloads.realtime_payload import (
+from openagentkit.core.models.payloads.realtime_payload import (
     RealtimeSessionPayload, 
     RealtimeTurnDetectionConfig, 
     RealtimeClientPayload,
 )
-from openagentkit.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.models.responses import UsageResponse, PromptTokensDetails, CompletionTokensDetails
-from openagentkit.interfaces import AsyncBaseLLMModel
+from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from openagentkit.core.models.responses import UsageResponse, PromptTokensDetails, CompletionTokensDetails
+from openagentkit.core.interfaces import AsyncBaseLLMModel
 
 import os
 from openai._types import NOT_GIVEN, NotGiven

@@ -2,9 +2,15 @@ from typing import Any, Callable, Dict, List, Optional, Union, Generator
 from openai import OpenAI
 from openai._types import NOT_GIVEN
 from pydantic import BaseModel
-from openagentkit.handlers.tool_handler import ToolHandler
-from openagentkit.interfaces.base_llm_model import BaseLLMModel
-from openagentkit.models.responses import OpenAgentResponse, UsageResponse, PromptTokensDetails, CompletionTokensDetails, OpenAgentStreamingResponse
+from openagentkit.core.handlers.tool_handler import ToolHandler
+from openagentkit.core.interfaces.base_llm_model import BaseLLMModel
+from openagentkit.core.models.responses import (
+    OpenAgentResponse, 
+    UsageResponse, 
+    PromptTokensDetails, 
+    CompletionTokensDetails, 
+    OpenAgentStreamingResponse
+)
 import os
 
 class OpenAILLMService(BaseLLMModel):
@@ -244,12 +250,13 @@ class OpenAILLMService(BaseLLMModel):
             tools=tools,
             response_schema=response_schema, 
         )
-            
-        # Extract tool_calls arguments using the tool handler
-        tool_calls = self._tool_handler.parse_tool_args(response)
         
-        # Update the response with the parsed tool calls
-        response.tool_calls = tool_calls
+        if response.tool_calls:
+            # Extract tool_calls arguments using the tool handler
+            tool_calls = self._tool_handler.parse_tool_args(response)
+            
+            # Update the response with the parsed tool calls
+            response.tool_calls = tool_calls
         
         return response
 
@@ -339,7 +346,6 @@ class OpenAILLMService(BaseLLMModel):
             
             # After the stream is done, yield the final response with usage info if available
             if final_chunk and hasattr(final_chunk, 'usage'):
-                print(f"Final chunk usage: {list(final_tool_calls.values())}")
                 yield OpenAgentStreamingResponse(
                     role="assistant",
                     content=final_content,
@@ -487,21 +493,3 @@ class OpenAILLMService(BaseLLMModel):
             }
         ]
         return self._context_history
-    
-    # Delegate tool call handling to the tool handler
-    def _handle_tool_call(self, tool_name, **tool_args):
-        """
-        Handle the tool call.
-
-        Args:
-            tool_name: The name of the tool to handle.
-            **tool_args: The arguments to pass to the tool.
-
-        Returns:
-            The result of the tool call.
-        """
-        result = self._tool_handler._handle_tool_call(tool_name, **tool_args)
-        # Convert result to string if it's not already
-        if not isinstance(result, str):
-            return str(result)
-        return result

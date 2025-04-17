@@ -1,4 +1,4 @@
-from openagentkit.interfaces.base_speech_model import BaseSpeechModel
+from openagentkit.core.interfaces.base_speech_model import BaseSpeechModel
 import requests
 import os
 import io

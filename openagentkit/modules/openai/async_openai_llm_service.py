@@ -2,9 +2,9 @@ from typing import Any, Callable, Dict, List, Optional, Union, Literal
 from openai import AsyncOpenAI
 from openai._types import NOT_GIVEN, NotGiven
 from pydantic import BaseModel
-from openagentkit.handlers.tool_handler import ToolHandler
-from openagentkit.interfaces import AsyncBaseLLMModel
-from openagentkit.models.responses import (
+from openagentkit.core.handlers.tool_handler import ToolHandler
+from openagentkit.core.interfaces import AsyncBaseLLMModel
+from openagentkit.core.models.responses import (
     OpenAgentStreamingResponse, 
     OpenAgentResponse, 
     UsageResponse, 
@@ -500,16 +500,17 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             audio_format=audio_format,
             audio_voice=audio_voice,
         )
-            
-        # Extract tool_calls arguments using the tool handler
-        tool_calls = self._tool_handler.parse_tool_args(response)
         
-        # Update the response with the parsed tool calls
-        response.tool_calls = tool_calls
+        if response.tool_calls:
+            # Extract tool_calls arguments using the tool handler
+            tool_calls = self._tool_handler.parse_tool_args(response)
+            
+            # Update the response with the parsed tool calls
+            response.tool_calls = tool_calls
         
         return response
         
-    async def add_context(self, content: dict[str, str]):
+    def add_context(self, content: dict[str, str]):
         """
         Add context to the model.
 
@@ -525,7 +526,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         self._context_history.append(content)
         return self._context_history
         
-    async def extend_context(self, content: List[dict[str, str]]):
+    def extend_context(self, content: List[dict[str, str]]):
         """
         Extend the context of the model.
 
@@ -541,7 +542,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         self._context_history.extend(content)
         return self._context_history
     
-    async def clear_context(self):
+    def clear_context(self):
         """
         Clear the context of the model, leaving only the system message.
 
@@ -556,20 +557,3 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         ]
         return self._context_history
     
-    # Delegate tool call handling to the tool handler
-    async def _handle_tool_call(self, tool_name, **tool_args):
-        """
-        Handle the tool call.
-
-        Args:
-            tool_name: The name of the tool to handle.
-            **tool_args: The arguments to pass to the tool.
-
-        Returns:
-            The result of the tool call.
-        """
-        result = self._tool_handler._handle_tool_call(tool_name, **tool_args)
-        # Convert result to string if it's not already
-        if not isinstance(result, str):
-            return str(result)
-        return result
