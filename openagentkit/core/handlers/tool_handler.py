@@ -4,7 +4,7 @@ from openai._types import NOT_GIVEN
 import json
 from pydantic import BaseModel
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.core.models.tool_responses import ToolResponse, ToolCallResponse, ToolCallFunction
+from openagentkit.core.models.tool_responses import ToolResponse, ToolCallResponse, ToolCallFunction, ToolCallResult, ToolCallMessage
 
 class ToolHandler:
     """
@@ -45,7 +45,7 @@ class ToolHandler:
         } if tools is not NOT_GIVEN else NOT_GIVEN
         return logger.info(f"Binded {len(self._tools)} tools.")
     
-    def _handle_tool_call(self, tool_name: str, **kwargs) -> BaseModel:
+    def _handle_tool_call(self, tool_name: str, **kwargs) -> Any:
         """
         Handle the tool call and return the tool result.
 
@@ -54,7 +54,7 @@ class ToolHandler:
             **kwargs: The keyword arguments to pass to the tool.
 
         Returns:
-            BaseModel: The tool result (the tool response must be a Pydantic BaseModel)
+            Any: The result of the tool call.
         """
         if self.tools_map is not NOT_GIVEN:
             tool = self.tools_map.get(tool_name)
@@ -169,10 +169,12 @@ class ToolHandler:
             tool_args_list.append(tool_args)
 
             # Store tool call and result
-            tool_results_list.append({
-                "tool_call": tool_call,
-                "result": tool_result,
-            })
+            tool_results_list.append(
+                ToolCallResult(
+                    tool_name=tool_name,
+                    result=tool_result
+                )
+            )
             
             logger.info(f"Tool Result: {tool_result}")
             

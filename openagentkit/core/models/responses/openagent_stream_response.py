@@ -35,6 +35,7 @@ class OpenAgentStreamingResponse(BaseModel):
     delta_content: Optional[str] = None
     delta_audio: Optional[str] = None
     tool_calls: Optional[List[Union[Dict[str, Any], BaseModel, Any]]] = None
+    tool_results: Optional[List[Union[Dict[str, Any], BaseModel, Any]]] = None
     tool_notification: Optional[str] = None
     content: Optional[str] = None
     finish_reason: Optional[Literal["stop", "length", "tool_calls", "content_filter"]] = None

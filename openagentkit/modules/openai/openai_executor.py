@@ -183,9 +183,26 @@ class OpenAIExecutor(BaseExecutor):
                         "content": str(response.content),
                     }
                 )
+
+                yield OpenAgentResponse(
+                    role=response.role,
+                    content=str(response.content) if not isinstance(response.content, BaseModel) else response.content,
+                    tool_calls=response.tool_calls,
+                    refusal=response.refusal,
+                    usage=response.usage,
+                )
+
                 # Handle tool requests and get the final response with tool results
                 tool_response = self._tool_handler.handle_tool_request(
                     response=response,
+                )
+
+                yield OpenAgentResponse(
+                    role="tool",
+                    content=str(response.content) if not isinstance(response.content, BaseModel) else response.content,
+                    tool_results=tool_response.tool_results,
+                    refusal=response.refusal,
+                    usage=response.usage,
                 )
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
@@ -295,6 +312,13 @@ class OpenAIExecutor(BaseExecutor):
                         }
                     )
 
+                    yield OpenAgentStreamingResponse(
+                        role=chunk.role,
+                        content=str(chunk.content) if not isinstance(chunk.content, BaseModel) else chunk.content,
+                        tool_calls=chunk.tool_calls,
+                        usage=chunk.usage,
+                    )
+
                     logger.debug(f"Context: {context}") if debug else None
 
                     notification = self._tool_handler.handle_notification(chunk)
@@ -306,6 +330,12 @@ class OpenAIExecutor(BaseExecutor):
                     # Handle the tool call request and get the final response with tool results
                     tool_response = self._tool_handler.handle_tool_request(
                         response=chunk,
+                    )
+
+                    yield OpenAgentStreamingResponse(
+                        role="tool",
+                        content=str(chunk.content) if not isinstance(chunk.content, BaseModel) else chunk.content,
+                        tool_results=tool_response.tool_results,
                     )
 
                     logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
