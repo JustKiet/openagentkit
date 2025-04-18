@@ -4,3 +4,4 @@ openai
 pip-chill
 tiktoken
 websockets
+scipy

@@ -4,3 +4,5 @@ from .base_llm_model import BaseLLMModel
 from .base_speech_model import BaseSpeechModel
 from .async_base_llm_model import AsyncBaseLLMModel
 from .base_speech_model import BaseSpeechModel
+from .base_chunker import BaseChunker
+from .base_embedding_model import BaseEmbeddingModel

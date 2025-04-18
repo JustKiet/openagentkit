@@ -2,8 +2,8 @@ import tiktoken
 from openai import OpenAI
 from openai.types import CreateEmbeddingResponse
 from openagentkit.core.interfaces.base_embedding_model import BaseEmbeddingModel
-from openagentkit.core.models.responses.embedding_response import EmbeddingResponse, EmbeddingUnit
-from openagentkit.core.models.responses.usage_responses import EmbeddingUsageResponse
+from openagentkit.core.models.io.embeddings import EmbeddingUnit
+from openagentkit.core.models.responses import EmbeddingResponse
 from typing import Literal, Union
 
 class OpenAIEmbeddingModel(BaseEmbeddingModel):
@@ -41,16 +41,12 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             class EmbeddingResponse(BaseModel):
                 embeddings: list[EmbeddingUnit] # List of embeddings
                 embedding_model: str # The embedding model used
-                usage: EmbeddingUsageResponse # The usage of the embedding model
+                total_tokens: int # The total number of tokens used
 
             class EmbeddingUnit(BaseModel):
                 index: int # The index of the embedding
                 object: str # The object of the embedding
                 embedding: list[float] # The embedding vector
-            
-            class EmbeddingUsageResponse(BaseModel):
-                prompt_tokens: int # The number of prompt tokens used
-                total_tokens: int # The total number of tokens used
             ```
         Example:
             ```python
@@ -64,7 +60,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             # Get the embedding
             embedding: list[float] = embedding_response.embeddings[0].embedding
             # Get the usage
-            usage: EmbeddingUsageResponse = embedding_response.usage
+            total_tokens: int = embedding_response.total_tokens
             # Get the embedding model
             embedding_model: str = embedding_response.embedding_model
             ```
@@ -95,16 +91,12 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             class EmbeddingResponse(BaseModel):
                 embeddings: list[EmbeddingUnit] # List of embeddings
                 embedding_model: str # The embedding model used
-                usage: EmbeddingUsageResponse # The usage of the embedding model
+                total_tokens: int # The total number of tokens used
 
             class EmbeddingUnit(BaseModel):
                 index: int # The index of the embedding
                 object: str # The object of the embedding
                 embedding: list[float] # The embedding vector
-            
-            class EmbeddingUsageResponse(BaseModel):
-                prompt_tokens: int # The number of prompt tokens used
-                total_tokens: int # The total number of tokens used
             ```
         Example:
             ```python
@@ -118,7 +110,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             # Get the embeddings
             embeddings: list[EmbeddingUnit] = embedding_response.embeddings
             # Get the usage
-            usage: EmbeddingUsageResponse = embedding_response.usage
+            total_tokens: int = embedding_response.total_tokens
             # Get the embedding model
             embedding_model: str = embedding_response.embedding_model
             ```
@@ -135,24 +127,22 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         )
 
         embeddings: list[EmbeddingUnit] = []
-
-        usage: EmbeddingUsageResponse = EmbeddingUsageResponse(
-            prompt_tokens=response.usage.prompt_tokens,
-            total_tokens=response.usage.total_tokens,
-        )
         
         for embedding in response.data:
-            embeddings.append(EmbeddingUnit(
-                index=embedding.index,
-                object=embedding.object,
-                embedding=embedding.embedding,
-            ))
+            embeddings.append(
+                EmbeddingUnit(
+                    index=embedding.index,
+                    object=embedding.object,
+                    content=formatted_texts[embedding.index],
+                    embedding=embedding.embedding,
+                )
+            )
 
         if include_metadata:
             return EmbeddingResponse(
                 embeddings=embeddings,
                 embedding_model=self.embedding_model,
-                usage=usage,
+                total_tokens=response.usage.total_tokens,
             )
         else:
             return embeddings

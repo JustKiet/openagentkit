@@ -65,21 +65,3 @@ class UsageResponse(BaseModel):
     total_tokens: int
     prompt_tokens_details: PromptTokensDetails
     completion_tokens_details: CompletionTokensDetails
-
-class EmbeddingUsageResponse(BaseModel):
-    """
-    The usage response for embeddings models.
-
-    Schema:
-        ```python
-        class EmbeddingUsageResponse(BaseModel):
-            prompt_tokens: int
-            total_tokens: int
-        ```
-    Where:
-        - `prompt_tokens`: The prompt tokens.
-        - `total_tokens`: The total tokens.
-    """
-    prompt_tokens: int
-    total_tokens: int
-
