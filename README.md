@@ -19,7 +19,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ```bash
 pip install -i https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple \
-            openagentkit==0.1.0.dev13
+            openagentkit==0.1.0.dev14
 ```
 
 ## Quick Start
@@ -76,15 +76,15 @@ for response in generator:
 ## Supported Integrations
 
 - **LLM Providers**:
+
   - OpenAI
   - SmallestAI
   - Azure OpenAI (via OpenAI integration)
   - More coming soon!
-  
 - **Tools** *(Mostly for prototyping purposes)*:
+
   - Weather information *(Requires WEATHERAPI_API_KEY)*
   - Search capabilities *(Requires TAVILY_API_KEY)*
-
 
 ## Architecture
 
