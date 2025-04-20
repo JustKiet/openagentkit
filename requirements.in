@@ -1,7 +1,7 @@
-langchain-community
 loguru
 openai
 pip-chill
 tiktoken
 websockets
 scipy
+pymilvus

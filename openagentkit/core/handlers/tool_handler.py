@@ -43,7 +43,7 @@ class ToolHandler:
         self.tools_map = {
             tool.schema["function"]["name"]: tool for tool in tools
         } if tools is not NOT_GIVEN else NOT_GIVEN
-        return logger.info(f"Binded {len(self._tools)} tools.")
+        return f"Binded {len(self._tools)} tools."
     
     def _handle_tool_call(self, tool_name: str, **kwargs) -> Any:
         """
@@ -114,7 +114,7 @@ class ToolHandler:
                 tool_notification = args.get("_notification", None)
 
             if notification:
-                logger.info(f"Tool Notification: {tool_notification}")
+                #logger.info(f"Tool Notification: {tool_notification}")
                 return OpenAgentStreamingResponse(
                     role="assistant",
                     content=None,
@@ -143,7 +143,7 @@ class ToolHandler:
         
         # Check if the response contains tool calls
         if response.tool_calls is None:
-            logger.debug("No tool calls found in the response. Skipping tool call handling.")
+            #logger.debug("No tool calls found in the response. Skipping tool call handling.")
             return ToolResponse(
                 tool_args=[],
                 tool_calls=[],
@@ -176,7 +176,7 @@ class ToolHandler:
                 )
             )
             
-            logger.info(f"Tool Result: {tool_result}")
+            #logger.info(f"Tool Result: {tool_result}")
             
             # Convert tool result to string if it's not already a string
             tool_result_str = str(tool_result)

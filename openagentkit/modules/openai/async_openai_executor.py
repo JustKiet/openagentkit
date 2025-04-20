@@ -193,7 +193,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                 top_p=top_p,
             )
 
-            logger.info(f"Response Received: {response}")
+            logger.info(f"Response Received: {response}") if debug else None
 
             if response.content is not None:
                 # Add the response to the context (chat history)
@@ -238,22 +238,14 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                context = self._llm_service.extend_context(tool_response.tool_messages)
+                context = self._llm_service.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
 
                 logger.debug(f"Context: {context}") if debug else None
             
             else:
                 stop = True
             
-            if response.content is not None:
-                # Add the final response to the context (chat history)
-                self._llm_service.add_context(
-                    {
-                        "role": response.role,
-                        "content": str(response.content),
-                    }
-                )
-                
+            if response.content is not None:        
                 # If there is no response, return an error
                 if not response:
                     logger.error("No response from the model")
@@ -395,7 +387,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                     logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                    context = self._llm_service.extend_context(tool_response.tool_messages)
+                    context = self._llm_service.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
                     
                     logger.debug(f"Context in Stream Execute: {context}") if debug else None
 
