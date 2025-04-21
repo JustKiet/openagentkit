@@ -4,20 +4,15 @@
 #
 #    pip-compile requirements.in
 #
-aiohappyeyeballs==2.6.1
-    # via aiohttp
-aiohttp==3.11.16
-    # via langchain-community
-aiosignal==1.3.2
-    # via aiohttp
 annotated-types==0.7.0
     # via pydantic
 anyio==4.9.0
     # via
     #   httpx
+    #   mcp
     #   openai
-attrs==25.3.0
-    # via aiohttp
+    #   sse-starlette
+    #   starlette
 certifi==2025.1.31
     # via
     #   httpcore
@@ -25,163 +20,115 @@ certifi==2025.1.31
     #   requests
 charset-normalizer==3.4.1
     # via requests
-dataclasses-json==0.6.7
-    # via langchain-community
+click==8.1.8
+    # via
+    #   typer
+    #   uvicorn
 distro==1.9.0
     # via openai
-frozenlist==1.5.0
-    # via
-    #   aiohttp
-    #   aiosignal
-greenlet==3.1.1
-    # via sqlalchemy
 grpcio==1.67.1
     # via pymilvus
 h11==0.14.0
-    # via httpcore
+    # via
+    #   httpcore
+    #   uvicorn
 httpcore==1.0.8
     # via httpx
 httpx==0.28.1
     # via
-    #   langsmith
+    #   mcp
     #   openai
 httpx-sse==0.4.0
-    # via langchain-community
+    # via mcp
 idna==3.10
     # via
     #   anyio
     #   httpx
     #   requests
-    #   yarl
 jiter==0.9.0
     # via openai
-jsonpatch==1.33
-    # via langchain-core
-jsonpointer==3.0.0
-    # via jsonpatch
-langchain==0.3.23
-    # via langchain-community
-langchain-community==0.3.21
-    # via -r requirements.in
-langchain-core==0.3.51
-    # via
-    #   langchain
-    #   langchain-community
-    #   langchain-text-splitters
-langchain-text-splitters==0.3.8
-    # via langchain
-langsmith==0.3.31
-    # via
-    #   langchain
-    #   langchain-community
-    #   langchain-core
 loguru==0.7.3
     # via -r requirements.in
-marshmallow==3.26.1
-    # via dataclasses-json
+markdown-it-py==3.0.0
+    # via rich
+mcp[cli]==1.6.0
+    # via -r requirements.in
+mdurl==0.1.2
+    # via markdown-it-py
 milvus-lite==2.4.12
     # via pymilvus
-multidict==6.4.3
-    # via
-    #   aiohttp
-    #   yarl
-mypy-extensions==1.0.0
-    # via typing-inspect
 numpy==2.2.4
     # via
-    #   langchain-community
     #   pandas
     #   scipy
 openai==1.74.0
     # via -r requirements.in
-orjson==3.10.16
-    # via langsmith
-packaging==24.2
-    # via
-    #   langchain-core
-    #   langsmith
-    #   marshmallow
 pandas==2.2.3
     # via pymilvus
 pip-chill==1.0.3
     # via -r requirements.in
-propcache==0.3.1
-    # via
-    #   aiohttp
-    #   yarl
 protobuf==6.30.2
     # via pymilvus
 pydantic==2.11.3
     # via
-    #   langchain
-    #   langchain-core
-    #   langsmith
+    #   mcp
     #   openai
     #   pydantic-settings
 pydantic-core==2.33.1
     # via pydantic
 pydantic-settings==2.8.1
-    # via langchain-community
+    # via mcp
+pygments==2.19.1
+    # via rich
 pymilvus==2.5.6
     # via -r requirements.in
 python-dateutil==2.9.0.post0
     # via pandas
 python-dotenv==1.1.0
     # via
+    #   mcp
     #   pydantic-settings
     #   pymilvus
 pytz==2025.2
     # via pandas
-pyyaml==6.0.2
-    # via
-    #   langchain
-    #   langchain-community
-    #   langchain-core
 regex==2024.11.6
     # via tiktoken
 requests==2.32.3
-    # via
-    #   langchain
-    #   langchain-community
-    #   langsmith
-    #   requests-toolbelt
-    #   tiktoken
-requests-toolbelt==1.0.0
-    # via langsmith
+    # via tiktoken
+rich==14.0.0
+    # via typer
 scipy==1.15.2
     # via -r requirements.in
+shellingham==1.5.4
+    # via typer
 six==1.17.0
     # via python-dateutil
 sniffio==1.3.1
     # via
     #   anyio
     #   openai
-sqlalchemy==2.0.40
+sse-starlette==2.2.1
+    # via mcp
+starlette==0.46.2
     # via
-    #   langchain
-    #   langchain-community
-tenacity==9.1.2
-    # via
-    #   langchain-community
-    #   langchain-core
+    #   mcp
+    #   sse-starlette
 tiktoken==0.9.0
     # via -r requirements.in
 tqdm==4.67.1
     # via
     #   milvus-lite
     #   openai
+typer==0.15.2
+    # via mcp
 typing-extensions==4.13.2
     # via
     #   anyio
-    #   langchain-core
     #   openai
     #   pydantic
     #   pydantic-core
-    #   sqlalchemy
-    #   typing-inspect
+    #   typer
     #   typing-inspection
-typing-inspect==0.9.0
-    # via dataclasses-json
 typing-inspection==0.4.0
     # via pydantic
 tzdata==2025.2
@@ -190,12 +137,10 @@ ujson==5.10.0
     # via pymilvus
 urllib3==2.4.0
     # via requests
+uvicorn==0.34.2
+    # via mcp
 websockets==15.0.1
     # via -r requirements.in
-yarl==1.19.0
-    # via aiohttp
-zstandard==0.23.0
-    # via langsmith
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools

@@ -5,3 +5,4 @@ tiktoken
 websockets
 scipy
 pymilvus
+mcp[cli]

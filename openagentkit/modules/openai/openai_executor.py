@@ -6,7 +6,7 @@ from openai import OpenAI
 from openagentkit.core.interfaces.base_executor import BaseExecutor
 from openagentkit.modules.openai import OpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.core.handlers.tool_handler import ToolHandler
+from openagentkit.core.handlers import ToolHandler
 from pydantic import BaseModel
 import json
 import datetime

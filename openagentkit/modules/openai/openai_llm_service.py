@@ -2,7 +2,7 @@ from typing import Any, Callable, Dict, List, Optional, Union, Generator
 from openai import OpenAI
 from openai._types import NOT_GIVEN
 from pydantic import BaseModel
-from openagentkit.core.handlers.tool_handler import ToolHandler
+from openagentkit.core.handlers import ToolHandler
 from openagentkit.core.interfaces.base_llm_model import BaseLLMModel
 from openagentkit.core.models.responses import (
     OpenAgentResponse, 
@@ -32,7 +32,7 @@ class OpenAILLMService(BaseLLMModel):
             *args,
             **kwargs
         )
-        # Create an instance of ToolHandler instead of inheriting from it
+
         self._tool_handler = ToolHandler(tools=tools)
         
         self._client = client
@@ -280,7 +280,7 @@ class OpenAILLMService(BaseLLMModel):
             top_p: The top p to use in the response.
 
         Returns:
-            An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+            An Generator[OpenAgentStreamingResponse, None] object.
         """
 
         temperature = kwargs.get("temperature", temperature)

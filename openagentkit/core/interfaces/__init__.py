@@ -6,3 +6,4 @@ from .async_base_llm_model import AsyncBaseLLMModel
 from .base_speech_model import BaseSpeechModel
 from .base_chunker import BaseChunker
 from .base_embedding_model import BaseEmbeddingModel
+from .base_tool_handler import BaseToolHandler

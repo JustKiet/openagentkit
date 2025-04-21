@@ -6,10 +6,12 @@ from openai import AsyncOpenAI
 from openagentkit.core.interfaces.async_base_executor import AsyncBaseExecutor
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.core.handlers.tool_handler import ToolHandler
+from openagentkit.core.handlers import ToolHandler
 from pydantic import BaseModel
 import json
 import datetime
+
+from mcp import ClientSession
 
 class AsyncOpenAIExecutor(AsyncBaseExecutor):
     """
@@ -58,6 +60,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             max_tokens=max_tokens,
             top_p=top_p,
         )
+        self._tools = tools
         self._tool_handler = ToolHandler(tools=tools)
 
     @property
@@ -75,6 +78,14 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
     @property
     def top_p(self) -> float:
         return self._llm_service.top_p
+    
+    @property
+    def tools(self) -> List[Dict[str, Any]]:
+        return self._llm_service.tools
+    
+    async def connect_to_mcp(self, mcp_session: ClientSession):
+        self._tool_handler = await ToolHandler.from_mcp(session=mcp_session, additional_tools=self._tools)
+        self._llm_service._tool_handler = self._tool_handler
     
     def clone(self) -> 'AsyncOpenAIExecutor':
         """
@@ -216,8 +227,6 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                     }
                 )
 
-                print(type(response.content))
-
                 yield OpenAgentResponse(
                     role=response.role,
                     content=str(response.content) if not isinstance(response.content, (BaseModel, type(None))) else response.content,
@@ -227,7 +236,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                 )
 
                 # Handle tool requests abd get the final response with tool results
-                tool_response = self._tool_handler.handle_tool_request(
+                tool_response = await self._tool_handler.handle_tool_request(
                     response=response,
                 )
 
@@ -376,7 +385,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                         yield notification
 
                     # Handle the tool call request and get the final response with tool results
-                    tool_response = self._tool_handler.handle_tool_request(
+                    tool_response = await self._tool_handler.async_handle_tool_request(
                         response=chunk,
                     )
 
