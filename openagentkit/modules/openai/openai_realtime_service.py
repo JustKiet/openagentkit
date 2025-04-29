@@ -1,5 +1,5 @@
 from openai import AsyncOpenAI, AsyncAzureOpenAI
-from typing import List, Dict, Any, Optional, AsyncGenerator
+from typing import List, Dict, Any, Optional, AsyncGenerator, cast
 from openai.types.beta.realtime import *
 
 from openagentkit.core.models.payloads.realtime_payload import (
@@ -14,6 +14,7 @@ from openagentkit.core.interfaces import AsyncBaseLLMModel
 import os
 from openai._types import NOT_GIVEN, NotGiven
 from typing import Callable, Literal
+from openagentkit.core.handlers.tool_handler import ToolHandler
 from loguru import logger
 import websockets
 import asyncio
@@ -39,6 +40,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
         self._voice = voice
         self._system_message = system_message
         self._tools = tools
+        self._tool_handler = ToolHandler(tools=tools, type="OpenAIRealtime")
         self._api_key = api_key
         self.connection = None
         self._event_queue = asyncio.Queue()
@@ -66,10 +68,8 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
         match event.type:
             case "session.created":
                 logger.info(f"Session created: {event.session}")
-                return event.session
             case "session.updated":
                 logger.info(f"Session updated: {event.session}")
-                return event.session
             case _:
                 logger.warning(f"Unhandled session event type: {event.type}")
                 return None
@@ -143,11 +143,11 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                     if event.response.output[i].type == "function_call":
                         tool_calls.append(
                             {
-                                "id": event.response.output[i].id,
-                                "type": "function_call",
-                                "function_call": {
-                                    "name": event.response.output[i].function.name,
-                                    "arguments": event.response.output[i].function.arguments,
+                                "id": event.response.output[i].call_id,
+                                "type": "function",
+                                "function": {
+                                    "name": event.response.output[i].name,
+                                    "arguments": event.response.output[i].arguments,
                                 }
                             }
                         )
@@ -203,7 +203,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 return OpenAgentStreamingResponse(
                     role="assistant",
                     index=event.content_index,
-                    delta_content=event.delta,    
+                    delta_audio=event.delta,    
                 )
             case "response.audio.done":
                 logger.info(f"{event}")
@@ -299,7 +299,8 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                         "threshold": 0.5,
                         "create_response": True,
                         "interrupt_response": True
-                    }
+                    },
+                    "tools": self._tool_handler.tools
                 }
                 
                 logger.debug(f"Updating session with config: {session_config}")
@@ -323,13 +324,14 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             self._is_connected = False
             raise
 
-    async def model_generate(self, 
+    async def model_stream(self, 
                            messages: List[Dict[str, str]], 
-                           tools: Optional[List[Dict[str, Any]]], 
+                           tools: Optional[List[Dict[str, Any]]] = None, 
                            temperature: Optional[float] = None, 
                            max_tokens: Optional[int] = None, 
                            top_p: Optional[float] = None,
-                           **kwargs) -> AsyncGenerator[OpenAgentResponse, None]:
+                           audio: Optional[bool] = False,
+                           **kwargs):
         """Send a message and yield responses"""
         if not self._is_connected:
             raise RuntimeError("Not connected to Realtime API")
@@ -337,14 +339,14 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
         try:
             message = messages[-1]
             logger.info(f"Sending message: {message}")
-            
+
             await self.connection.conversation.item.create(
                 item=ConversationItemParam(
                     type="message",
                     role=message["role"],
                     content=[
                         ConversationItemContentParam(
-                            type="input_text",
+                            type="input_audio" if audio else "input_text",
                             text=message["content"]
                         )
                     ]
@@ -357,7 +359,27 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             while self._is_connected:
                 try:
                     response = await asyncio.wait_for(self._response_queue.get(), timeout=30.0)
-                    yield response
+                    response = cast(OpenAgentStreamingResponse, response)
+                    if response.tool_calls:
+                        tool_response = await self._tool_handler.async_handle_tool_request(
+                            response=response,
+                        )
+
+                        await self.connection.conversation.item.create(
+                            item=ConversationItemParam(
+                                type="function_call_output",
+                                call_id=tool_response.tool_messages[-1].tool_call_id,
+                                output=tool_response.tool_messages[-1].content,
+                            )
+                        )
+
+                        await self.connection.response.create()
+
+                        final_response = await asyncio.wait_for(self._response_queue.get(), timeout=30.0)
+                        final_response = cast(OpenAgentStreamingResponse, final_response)
+                        yield final_response
+                    else:
+                        yield response
                 except asyncio.TimeoutError:
                     logger.warning("No response received within timeout period")
                     break
@@ -366,7 +388,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             logger.error(f"Error in model_generate: {str(e)}")
             raise
 
-    async def model_stream(self, 
+    async def model_generate(self, 
                            messages: List[Dict[str, str]], 
                            tools: Optional[List[Dict[str, Any]]], 
                            temperature: Optional[float] = None, 
@@ -376,4 +398,4 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
         pass
 
     async def get_history(self) -> List[Dict[str, Any]]:
-        return self._context_history
+        return None

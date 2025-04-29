@@ -1,4 +1,4 @@
-from typing import List, Optional, Callable, Any, Union
+from typing import List, Optional, Callable, Any, Union, Literal
 from loguru import logger
 from openai._types import NOT_GIVEN
 import json
@@ -26,6 +26,7 @@ class ToolHandler(BaseToolHandler):
     def __init__(self,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
                  mcp_session: ClientSession = None,
+                 type: Literal["OpenAI", "OpenAIRealtime"] = "OpenAI",
                  *args,
                  **kwargs):
         
@@ -33,13 +34,20 @@ class ToolHandler(BaseToolHandler):
         self.tools_map = NOT_GIVEN
 
         if tools is not NOT_GIVEN:
-            self._tools = [
-                tool.schema for tool in tools
-            ]
-            self.tools_map = {
-                tool.schema["function"]["name"]: tool for tool in tools
-            }
-
+            if type == "OpenAI":
+                self._tools = [
+                    tool.schema for tool in tools
+                ]
+                self.tools_map = {
+                    tool.schema["function"]["name"]: tool for tool in tools
+                }
+            elif type == "OpenAIRealtime":
+                self._tools = [
+                    tool.schema for tool in tools
+                ]
+                self.tools_map = {
+                    tool.schema["name"]: tool for tool in tools
+                }
         self.session: Optional[ClientSession] = mcp_session
 
     @classmethod

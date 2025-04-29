@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Union, Literal
 from pydantic import BaseModel
 
 class EmbeddingSplits(BaseModel):
@@ -42,4 +42,5 @@ class EmbeddingUnit(BaseModel):
     index: int
     object: str
     content: str
-    embedding: list[float]
+    embedding: Union[list[float], str]
+    type: Literal["base64", "float"]

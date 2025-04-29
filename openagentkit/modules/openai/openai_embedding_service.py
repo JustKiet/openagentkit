@@ -12,16 +12,22 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                  embedding_model: Literal[
                      "text-embedding-3-small", 
                      "text-embedding-3-large", 
-                     "text-embedding-ada-002"
+                     "text-embedding-ada-002",
                  ] = "text-embedding-3-small",
                  embedding_encoding: str = "cl100k_base",
-                 encoding_format: Literal["float", "base64"] = "float",
-                 dimensions: int = None):
+                 encoding_format: Literal["float", "base64"] = "float"):
         self.client = client
         self.embedding_model = embedding_model
         self.embedding_encoding = embedding_encoding
         self.encoding_format = encoding_format
-        self.dimensions = dimensions
+
+        match self.embedding_model:
+            case "text-embedding-3-small":
+                self.dimensions = 1536
+            case "text-embedding-3-large":
+                self.dimensions = 3072
+            case "text-embedding-ada-002":
+                self.dimensions = 1536
 
     def encode_query(self, 
                      query: str,
@@ -135,6 +141,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                     object=embedding.object,
                     content=formatted_texts[embedding.index],
                     embedding=embedding.embedding,
+                    type=self.encoding_format
                 )
             )
 

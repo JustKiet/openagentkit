@@ -95,11 +95,11 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             A new AsyncOpenAIExecutor object with the same parameters.
         """
         return AsyncOpenAIExecutor(
-            client=self._llm_service.client,
-            model=self._llm_service.model,
-            system_message=self._llm_service.system_message,
-            tools=self._llm_service.tools,
-            api_key=self._llm_service.api_key,
+            client=self._llm_service._client,
+            model=self._llm_service._model,
+            system_message=self._llm_service._system_message,
+            tools=self._tools,
+            api_key=self._llm_service._api_key,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             top_p=self.top_p,
@@ -185,7 +185,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         debug = kwargs.get("debug", False)
         
         if tools == NOT_GIVEN:
-            tools = self._llm_service.tools
+            tools = self._llm_service._tool_handler.tools
         
         context = self._llm_service.extend_context(messages)
         

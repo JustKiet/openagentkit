@@ -110,6 +110,7 @@ def get_type_metadata(annotation, description: Optional[str] = None) -> dict:
 
 def tool(
         description: str, 
+        type: Literal["OpenAI", "OpenAIRealtime"] = "OpenAI",
         _notification: bool = False,
         _notification_message: str = "The notification that you say to the user when you are executing this tool. If you execute multiple tools, you must include all the tool names in the notification too."):
     """
@@ -167,20 +168,33 @@ def tool(
 
             required.append(name)
 
-        wrapper.schema = {
-            "type": "function",
-            "function": {
-                "name": func.__name__,
-                "description": description,
-                "strict": True if properties else False,
-                "parameters": {
-                    "type": "object" if properties else None,
-                    "properties": properties if properties else None,
-                    "required": required if required else [],
-                    "additionalProperties": False if properties else None,
-                },
-            }
-        }
+        match type:
+            case "OpenAI":
+                wrapper.schema = {
+                    "type": "function",
+                    "function": {
+                        "name": func.__name__,
+                        "description": description,
+                        "strict": True if properties else False,
+                        "parameters": {
+                            "type": "object" if properties else None,
+                            "properties": properties if properties else None,
+                            "required": required if required else [],
+                            "additionalProperties": False if properties else None,
+                        },
+                    }
+                }
+            case "OpenAIRealtime":
+                wrapper.schema = {
+                    "type": "function",
+                    "name": func.__name__,
+                    "description": description,
+                    "parameters": {
+                        "type": "object" if properties else None,
+                        "properties": properties if properties else None,
+                        "required": required if required else [],
+                    }
+                }
         
         wrapper.schema = dict(remove_none_values(wrapper.schema))
 
