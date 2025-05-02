@@ -5,6 +5,8 @@
 
 A comprehensive open-source toolkit for building agentic applications. OpenAgentKit provides a unified interface to work with various LLM providers, tools, and agent frameworks.
 
+**NOTE**: Everything here is still in development, expect many bugs and unsupported features, please feel free to contribute! 
+
 ## Features
 
 - **Unified LLM Interface**: Consistent API across multiple LLM providers
