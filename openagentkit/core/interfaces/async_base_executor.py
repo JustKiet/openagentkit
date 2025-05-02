@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from typing import Optional, AsyncGenerator, List, Dict, Any
+from mcp import ClientSession
 
 class AsyncBaseExecutor(ABC):
     """
@@ -38,6 +39,16 @@ class AsyncBaseExecutor(ABC):
         
         Returns:
             str: The defined system message.
+        """
+        raise NotImplementedError
+    
+    @abstractmethod
+    async def connect_to_mcp(self, mcp_sessions: List[ClientSession]) -> None:
+        """
+        An abstract method to connect the executor to the MCP sessions.
+        
+        Args:
+            sessions (List[Dict[str, Any]]): The sessions to be connected.
         """
         raise NotImplementedError
 

@@ -15,7 +15,7 @@ import os
 
 class OpenAILLMService(BaseLLMModel):
     def __init__(self, 
-                 client: OpenAI,
+                 client: OpenAI = None,
                  model: str = "gpt-4o-mini",
                  system_message: Optional[str] = None,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
@@ -33,9 +33,18 @@ class OpenAILLMService(BaseLLMModel):
             **kwargs
         )
 
-        self._tool_handler = ToolHandler(tools=tools)
+        self._tool_handler = ToolHandler(
+            tools=tools, llm_provider="openai", schema_type="OpenAI"
+        )
         
         self._client = client
+        if client is None:
+            if api_key is None:
+                raise ValueError("No API key provided. Please set the OPENAI_API_KEY environment variable or pass it as an argument.")
+            self._client = OpenAI(
+                api_key=api_key,
+            )
+
         self._model = model
         self._system_message = system_message
         self._api_key = api_key

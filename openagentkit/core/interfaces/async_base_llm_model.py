@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from pydantic import BaseModel
-from typing import Union, Optional, AsyncGenerator, List, Dict
+from typing import Optional, AsyncGenerator, List, Dict
 
 class AsyncBaseLLMModel(ABC):
     """

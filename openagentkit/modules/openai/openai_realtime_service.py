@@ -1,29 +1,23 @@
-from openai import AsyncOpenAI, AsyncAzureOpenAI
+from openai import AsyncOpenAI
 from typing import List, Dict, Any, Optional, AsyncGenerator, cast
 from openai.types.beta.realtime import *
 
-from openagentkit.core.models.payloads.realtime_payload import (
-    RealtimeSessionPayload, 
-    RealtimeTurnDetectionConfig, 
-    RealtimeClientPayload,
-)
-from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
+from openagentkit.core.models.responses import OpenAgentStreamingResponse
 from openagentkit.core.models.responses import UsageResponse, PromptTokensDetails, CompletionTokensDetails
 from openagentkit.core.interfaces import AsyncBaseLLMModel
 
 import os
-from openai._types import NOT_GIVEN, NotGiven
+from openai._types import NOT_GIVEN
 from typing import Callable, Literal
 from openagentkit.core.handlers.tool_handler import ToolHandler
 from loguru import logger
-import websockets
 import asyncio
 
 class OpenAIRealtimeService(AsyncBaseLLMModel):
     def __init__(self, 
-                 client: AsyncOpenAI,
+                 client: AsyncOpenAI = None,
                  model: str = "gpt-4o-mini-realtime-preview",
-                 voice: Literal["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"] = None,
+                 voice: Literal["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"] = "alloy",
                  system_message: Optional[str] = None,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
                  api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
@@ -36,11 +30,20 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             top_p=top_p
         )
         self._client = client
+        if self._client is None:
+            if api_key is None:
+                raise ValueError("No API key provided. Please set the OPENAI_API_KEY environment variable or pass it as an argument.")
+            self._client = AsyncOpenAI(
+                api_key=api_key,
+            )
+
         self._model = model
         self._voice = voice
         self._system_message = system_message
         self._tools = tools
-        self._tool_handler = ToolHandler(tools=tools, type="OpenAIRealtime")
+        self._tool_handler = ToolHandler(
+            tools=tools, llm_provider="openai", schema_type="OpenAIRealtime"
+        )
         self._api_key = api_key
         self.connection = None
         self._event_queue = asyncio.Queue()
@@ -353,8 +356,11 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 )
             )
 
+            print(f"Sending message: {message['content']}")
+
             await self.connection.response.create()
 
+            logger.info("Response created")
             # Yield responses as they come in
             while self._is_connected:
                 try:

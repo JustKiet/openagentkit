@@ -25,40 +25,81 @@ class ToolHandler(BaseToolHandler):
     """
     def __init__(self,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
-                 mcp_session: ClientSession = None,
-                 type: Literal["OpenAI", "OpenAIRealtime"] = "OpenAI",
+                 mcp_sessions: Optional[dict[str, ClientSession]] = None,
+                 mcp_tools: Optional[dict[str, list[str]]] = None,
+                 llm_provider: Literal["openai"] = None,
+                 schema_type: Literal["OpenAI", "OpenAIRealtime"] = None,
                  *args,
                  **kwargs):
         
         self._tools = NOT_GIVEN
         self.tools_map = NOT_GIVEN
+        self.llm_provider = llm_provider
+
+        if llm_provider is None:
+            raise ValueError("llm_provider must be provided")
 
         if tools is not NOT_GIVEN:
-            if type == "OpenAI":
-                self._tools = [
-                    tool.schema for tool in tools
-                ]
-                self.tools_map = {
-                    tool.schema["function"]["name"]: tool for tool in tools
-                }
-            elif type == "OpenAIRealtime":
-                self._tools = [
-                    tool.schema for tool in tools
-                ]
-                self.tools_map = {
-                    tool.schema["name"]: tool for tool in tools
-                }
-        self.session: Optional[ClientSession] = mcp_session
+            self._tools = []
+            for tool in tools:
+                if not hasattr(tool, "schema"):
+                    raise ValueError(f"Function '{tool.__name__}' does not have a `schema` attribute. Please wrap the function with `@tool` decorator from `openagentkit.core.utils.tool_wrapper`.")
+                self._tools.append(tool.schema)
+
+            match schema_type:
+                case "OpenAI":
+                    self.tools_map = {
+                        tool.schema["function"]["name"]: tool for tool in tools
+                    }
+                case "OpenAIRealtime":
+                    self.tools_map = {
+                        tool.schema["name"]: tool for tool in tools
+                    }
+                case None:
+                    raise ValueError("schema_type must be provided")
+                case _:
+                    raise ValueError(f"Unsupported schema type: {schema_type}")
+
+        self.sessions_map = mcp_sessions
+        self.mcp_tools_map = mcp_tools
+
 
     @classmethod
-    async def from_mcp(cls, session: ClientSession, additional_tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN):
+    async def from_mcp(cls, 
+                       sessions: list[ClientSession],
+                       additional_tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
+                       llm_provider: Literal["openai"] = None) -> "ToolHandler":
         """Asynchronous factory method to create an instance with tools loaded."""
-        self = cls(mcp_session=session, tools=additional_tools)
-        await self.load_mcp_tools()
-        return self
+        mcp_sessions = {}
+        mcp_tools = {}
+        for session in sessions:
+            if not isinstance(session, ClientSession):
+                raise ValueError("All sessions must be of type ClientSession")
+            initialization = await session.initialize()
 
-    async def load_mcp_tools(self):
-        tool_list = await self.session.list_tools()
+            mcp_sessions[initialization.serverInfo.name] = session
+
+            list_tools = await session.list_tools()
+            tool_names = [tool.name for tool in list_tools.tools]
+            mcp_tools[initialization.serverInfo.name] = tool_names
+
+        self = cls(mcp_sessions=mcp_sessions, mcp_tools=mcp_tools, tools=additional_tools, llm_provider=llm_provider)
+
+        for session in sessions:
+            await self.load_mcp_tools(session=session)
+
+        return self
+    
+    def _handle_mcp_tool_schema(self, tool: dict) -> dict:
+        match self.llm_provider:
+            case "openai":
+                tool["parameters"] = tool.pop("inputSchema")
+            case _:
+                raise ValueError(f"Unsupported LLM provider: {self.llm_provider}")
+        return tool
+
+    async def load_mcp_tools(self, session: ClientSession):
+        tool_list = await session.list_tools()
 
         tool_schemas = [tool.model_dump() for tool in tool_list.tools]
         
@@ -66,7 +107,7 @@ class ToolHandler(BaseToolHandler):
 
         for tool in tool_schemas:
             # Check if the tool is already in the tools list
-            tool["parameters"] = tool.pop("inputSchema")
+            tool = self._handle_mcp_tool_schema(tool)
             parsed_tools.append(tool)
         
         mcp_tools = [
@@ -103,7 +144,7 @@ class ToolHandler(BaseToolHandler):
     
     async def _async_handle_tool_call(self, tool_name: str, **kwargs) -> Any:
         """
-        Handle the tool call asynchronously and return the tool result.
+        Handle the tool call asynchronously and return the tool result. This method supports MCP tool calling.
 
         Args:
             tool_name (str): The name of the tool to handle.
@@ -120,10 +161,12 @@ class ToolHandler(BaseToolHandler):
                 return tool(**kwargs)
             elif isinstance(tool, dict):
                 tool_arguments = kwargs
-                tool_results = await self.session.call_tool(
-                    name=tool_name, arguments=tool_arguments,
-                )
-                return str([tool_result.model_dump() for tool_result in tool_results.content])
+                for session_name, tools in self.mcp_tools_map.items():
+                    if tool_name in tools:
+                        tool_results = await self.sessions_map[session_name].call_tool(
+                            name=tool_name, arguments=tool_arguments,
+                        )
+                        return str([tool_result.model_dump() for tool_result in tool_results.content])
         else:
             logger.error("No tools provided")
             return None

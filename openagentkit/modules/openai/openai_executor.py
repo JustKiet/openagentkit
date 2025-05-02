@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Union, Generator
+from typing import Any, Callable, Dict, List, Optional, Generator
 import os
 from loguru import logger
 from openai._types import NOT_GIVEN
@@ -8,12 +8,11 @@ from openagentkit.modules.openai import OpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.core.handlers import ToolHandler
 from pydantic import BaseModel
-import json
 import datetime
 
 class OpenAIExecutor(BaseExecutor):
     def __init__(self,
-                 client: OpenAI,
+                 client: OpenAI = None,
                  model: str = "gpt-4o-mini",
                  system_message: Optional[str] = None,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
@@ -34,7 +33,9 @@ class OpenAIExecutor(BaseExecutor):
             top_p=top_p,
         )
 
-        self._tool_handler = ToolHandler(tools=tools)
+        self._tool_handler = ToolHandler(
+            tools=tools, llm_provider="openai", schema_type="OpenAI"
+        )
 
     @property
     def model(self) -> str:

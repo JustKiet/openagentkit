@@ -12,14 +12,12 @@ from openagentkit.core.models.responses import (
     CompletionTokensDetails, 
 )
 from typing import AsyncGenerator
-import asyncio
 import os
-import json
 from loguru import logger
 
 class AsyncOpenAILLMService(AsyncBaseLLMModel):
     def __init__(self, 
-                 client: AsyncOpenAI,
+                 client: AsyncOpenAI = None,
                  model: str = "gpt-4o-mini",
                  system_message: Optional[str] = None,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
@@ -35,9 +33,18 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             top_p=top_p
         )
         # Create an instance of ToolHandler instead of inheriting from it
-        self._tool_handler = ToolHandler(tools=tools)
+        self._tool_handler = ToolHandler(
+            tools=tools, llm_provider="openai", schema_type="OpenAI"
+        )
         
         self._client = client
+        if self._client is None:
+            if api_key is None:
+                raise ValueError("No API key provided. Please set the OPENAI_API_KEY environment variable or pass it as an argument.")
+            self._client = AsyncOpenAI(
+                api_key=api_key,
+            )
+
         self._model = model
         self._system_message = system_message
         self._api_key = api_key

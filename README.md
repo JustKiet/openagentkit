@@ -19,7 +19,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ```bash
 pip install -i https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple \
-            openagentkit==0.1.0.dev17
+            openagentkit==0.1.0.dev18
 ```
 
 ## Quick Start
@@ -33,10 +33,8 @@ import openai
 import os
 
 # Define a tool
-@tool(
-    description="Get the weather of a city", # Define the tool description
-)
-def get_weather(city: Annotated[str, "The city to get the weather of"]): # Each argument must be of type Annotated
+@tool # Wrap the function in a tool decorator to automatically create a schema
+def get_weather(city: str):
     """Get the weather of a city"""
 
     # Actual implementation here...
@@ -110,10 +108,8 @@ import openai
 import os
 
 # Define a tool
-@tool(
-    description="Get the weather of a city", # Define the tool description
-)
-def get_weather(city: Annotated[str, "The city to get the weather of"]): # Each argument must be of type Annotated
+@tool # Wrap the function in a tool decorator to automatically create a schema
+def get_weather(city: str):
     """Get the weather of a city"""
 
     # Actual implementation here...
@@ -162,11 +158,9 @@ from pydantic import BaseModel
 from typing import Annotated
 
 # Define a tool
-@tool(
-    description="Get the weather of a city", # Define the tool description
-)
-def get_weather(city: Annotated[str, "The city to get the weather of"]): # Each argument must be of type Annotated
-    """Get the weather of a city"""
+@tool # Wrap the function in a tool decorator to automatically create a schema
+def get_weather(city: str):
+    """Get the weather of a city""" # Always try to add pydoc in the function for better comprehension by LLM 
 
     # Actual implementation here...
     # ...

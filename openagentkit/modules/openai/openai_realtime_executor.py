@@ -2,9 +2,8 @@ from openagentkit.core.interfaces import AsyncBaseExecutor
 from typing import Optional, List, Dict, Any, AsyncGenerator
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.modules.openai.openai_realtime_service import OpenAIRealtimeService
-import websockets
 from pydantic import BaseModel
-from openai import AsyncOpenAI, AsyncAzureOpenAI
+from openai import AsyncOpenAI
 from openagentkit.core.handlers.tool_handler import ToolHandler
 from openai._types import NOT_GIVEN
 from typing import Callable, Literal

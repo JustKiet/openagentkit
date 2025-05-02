@@ -7,7 +7,7 @@ def tool(
     _func: Callable = None,
     *,
     description: str = "",
-    type: Literal["OpenAI", "OpenAIRealtime"] = "OpenAI",
+    schema_type: Literal["OpenAI", "OpenAIRealtime"] = "OpenAI",
     add_tool_notification: bool = False,
     notification_message_guide: str = (
         "The notification that you say to the user when you are executing this tool. "
@@ -45,7 +45,7 @@ def tool(
 
             tool_arguments.get("required", []).append("_notification")
 
-        match type:
+        match schema_type:
             case "OpenAI":
                 wrapper.schema = {
                     "type": "function",
