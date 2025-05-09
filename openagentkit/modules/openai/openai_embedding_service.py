@@ -4,10 +4,12 @@ from openagentkit.core.interfaces.base_embedding_model import BaseEmbeddingModel
 from openagentkit.core.models.io.embeddings import EmbeddingUnit
 from openagentkit.core.models.responses import EmbeddingResponse
 from typing import Literal, Union
+import os
 
 class OpenAIEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, 
-                 client: OpenAI,
+                 client: OpenAI = None,
+                 api_key: str = os.getenv("OPENAI_API_KEY"),
                  embedding_model: Literal[
                      "text-embedding-3-small", 
                      "text-embedding-3-large", 
@@ -16,20 +18,48 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                  embedding_encoding: str = "cl100k_base",
                  encoding_format: Literal["float", "base64"] = "float"):
         self.client = client
+        if self.client is None:
+            if api_key is None:
+                raise ValueError("No API key provided. Please set the OPENAI_API_KEY environment variable or pass it as an argument.")
+            self.client = OpenAI(api_key=api_key)
+
         self.embedding_model = embedding_model
         self.embedding_encoding = embedding_encoding
         self.encoding_format = encoding_format
 
         match self.embedding_model:
             case "text-embedding-3-small":
-                self.dimensions = 1536
+                self._dimensions = 1536
             case "text-embedding-3-large":
-                self.dimensions = 3072
-            case "text-embedding-ada-002":
-                self.dimensions = 1536
+                self._dimensions = 3072
+            case " EmbeddingUnit: The embedding unit.text-embedding-ada-002":
+                self._dimensions = 1536
+
+        self._encoding_format = encoding_format
+
+    @property
+    def encoding_format(self) -> str:
+        """
+        Get the encoding format.
+        Returns:
+            The encoding format.
+        """
+        return self._encoding_format
+    
+    @encoding_format.setter
+    def encoding_format(self, value: str) -> None:
+        """
+        Set the encoding format.
+        Args:
+            value: The encoding format to set. Can be "float" or "base64".
+        """
+        if value not in ["float", "base64"]:
+            raise ValueError("Invalid encoding format. Must be 'float' or 'base64'.")
+        self._encoding_format = value
+        return self._encoding_format
     
     @property
-    def _embedding_model(self) -> str:
+    def embedding_model(self) -> str:
         """
         Get the embedding model.
         Returns:
@@ -37,21 +67,16 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         """
         return self._embedding_model
     
-    @_embedding_model.setter
-    def _embedding_model(self, value: str) -> str:
+    @embedding_model.setter
+    def embedding_model(self, value: str) -> None:
         """
         Set the embedding model.
         Args:
             value: The embedding model to set.
         """
-        if value not in [
-            "text-embedding-3-small", 
-            "text-embedding-3-large", 
-            "text-embedding-ada-002"
-        ]:
-            raise ValueError(f"Invalid embedding model: {value}")
+        if value not in ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"]:
+            raise ValueError("Invalid embedding model. Must be 'text-embedding-3-small', 'text-embedding-3-large', or 'text-embedding-ada-002'.")
         self._embedding_model = value
-        return self._embedding_model
     
     @property
     def embedding_encoding(self) -> str:
@@ -63,16 +88,15 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         return self._embedding_encoding
     
     @embedding_encoding.setter
-    def embedding_encoding(self, value: str) -> str:
+    def embedding_encoding(self, value: str) -> None:
         """
         Set the embedding encoding.
         Args:
-            value: The embedding encoding to set.
+            value: The embedding encoding to set. Currently, only "cl100k_base" is supported.
         """
-        if value not in ["cl100k_base"]:
-            raise ValueError(f"Invalid embedding encoding: {value}")
+        if value != "cl100k_base":
+            raise ValueError("Invalid embedding encoding. Currently, only 'cl100k_base' is supported.")
         self._embedding_encoding = value
-        return self._embedding_encoding
     
     @property
     def encoding_format(self) -> str:
@@ -84,16 +108,15 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         return self._encoding_format
     
     @encoding_format.setter
-    def encoding_format(self, value: str) -> str:
+    def encoding_format(self, value: str) -> None:
         """
         Set the encoding format.
         Args:
-            value: The encoding format to set.
+            value: The encoding format to set. Can be "float" or "base64".
         """
         if value not in ["float", "base64"]:
-            raise ValueError(f"Invalid encoding format: {value}")
+            raise ValueError("Invalid encoding format. Must be 'float' or 'base64'.")
         self._encoding_format = value
-        return self._encoding_format
 
     def encode_query(self, 
                      query: str,
@@ -105,7 +128,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             query: A single query to encode.
             include_metadata: Whether to include metadata in the response. (default: `False`)
         Returns:
-            If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the embedding.
+            If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the embedding with metadata.
             
             If `include_metadata` is `False`, return an `EmbeddingUnit` object containing the embedding.
         Schema:
@@ -156,7 +179,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             texts: A list of texts to encode.
             include_metadata: Whether to include metadata in the response. (default: `False`)
         Returns:
-            If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the embeddings.
+            If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the embeddings with metadata.
             If `include_metadata` is `False`, return a list of `EmbeddingUnit` objects containing the embeddings.
         Schema:
             ```python

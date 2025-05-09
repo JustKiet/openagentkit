@@ -45,7 +45,7 @@ class AsyncBaseExecutor(ABC):
         return self._system_message
     
     @system_message.setter
-    def system_message(self, value: str):
+    def system_message(self, value: str) -> None:
         """
         Set the system message.
 

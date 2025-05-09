@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from openagentkit.core.models.responses.embedding_response import EmbeddingResponse, EmbeddingUnit
-from typing import Union
+from typing import Union, Literal
 
 class AsyncBaseEmbeddingModel(ABC):
     """
@@ -11,6 +11,22 @@ class AsyncBaseEmbeddingModel(ABC):
 
         `tokenize_texts()`: An abstract method to tokenize texts.
     """
+    @abstractmethod
+    async def encode_query(self, query: str, include_metadata: bool = False) -> Union[list[EmbeddingUnit], EmbeddingResponse]:
+        """
+        An abstract method to encode a query into an embedding.
+
+        Args:
+            query (str): The query to encode.
+            include_metadata (bool): Whether to include metadata in the response.
+
+        Returns:
+            Union[list[EmbeddingUnit], EmbeddingResponse]: The embeddings response. 
+            If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the embedding. 
+            If `include_metadata` is `False`, return a list of `EmbeddingUnit` objects containing the embedding.
+        """
+        raise NotImplementedError("encode_query method must be implemented")
+
     @abstractmethod
     async def encode_texts(self, texts: list[str], include_metadata: bool = False) -> Union[list[EmbeddingUnit], EmbeddingResponse]:
         """
@@ -28,7 +44,7 @@ class AsyncBaseEmbeddingModel(ABC):
         raise NotImplementedError("encode_texts method must be implemented")
     
     @abstractmethod
-    async def tokenize_texts(self, texts: list[str]) -> list[list[int]]:
+    def tokenize_texts(self, texts: list[str]) -> list[list[int]]:
         """
         An abstract method to tokenize texts.
 

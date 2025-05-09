@@ -6,4 +6,7 @@ from .async_base_llm_model import AsyncBaseLLMModel
 from .base_speech_model import BaseSpeechModel
 from .base_chunker import BaseChunker
 from .base_embedding_model import BaseEmbeddingModel
+from .async_base_embedding_model import AsyncBaseEmbeddingModel
 from .base_tool_handler import BaseToolHandler
+from .async_reranker_model import AsyncBaseRerankerModel
+from .base_reranker_model import BaseRerankerModel
