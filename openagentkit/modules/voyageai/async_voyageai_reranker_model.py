@@ -1,27 +1,21 @@
 from openagentkit.core.interfaces import BaseRerankerModel
 from openagentkit.core.models.responses.reranking_response import RerankingResponse
 from openagentkit.core.models.io.reranking import RerankingUnit
-from voyageai import Client
+from voyageai import AsyncClient
 from typing import Literal, Union
 import os
 
-class VoyageRerankerModel(BaseRerankerModel):
+class AsyncVoyageAIRerankerModel(BaseRerankerModel):
     def __init__(self, 
-                 client: Client = None,
+                 client: AsyncClient = None,
                  api_key: str = os.getenv("VOYAGE_API_KEY"),
                  reranking_model: Literal["rerank-2", "rerank-2-lite"] = "rerank-2",
                  ):
-        """
-        Initialize the VoyageRerankerModel with a Voyage client.
-
-        Args:
-            client (Client): The Voyage client to use for reranking.
-        """
         self._client = client
         if self._client is None:
             if api_key is None:
                 raise ValueError("No API key provided. Please set the VOYAGE_API_KEY environment variable or pass it as an argument.")
-            self._client = Client(api_key=api_key)
+            self._client = AsyncClient(api_key=api_key)
 
         self._reranking_model = reranking_model
 
@@ -47,11 +41,11 @@ class VoyageRerankerModel(BaseRerankerModel):
             raise ValueError("Invalid reranking model. Must be 'rerank-2' or 'rerank-2-lite'.")
         self._reranking_model = value
 
-    def rerank(self,
-                query: str, 
-                items: list[str],
-                top_k: int,
-                include_metadata: bool = True) -> Union[list[RerankingUnit], RerankingResponse]:
+    async def rerank(self,
+                     query: str, 
+                     items: list[str],
+                     top_k: int,
+                     include_metadata: bool = True) -> Union[list[RerankingUnit], RerankingResponse]:
         """
         Rerank a list of items based on a query.
 
@@ -65,7 +59,7 @@ class VoyageRerankerModel(BaseRerankerModel):
               If `include_metadata` is `True`, return an `RerankingResponse` object containing the reranked items with metadata.
               If `include_metadata` is `False`, return a list of `RerankingUnit` objects containing the reranked items.
         """
-        response = self._client.rerank(
+        response = await self._client.rerank(
               model=self._reranking_model,
               query=query,
               documents=items,

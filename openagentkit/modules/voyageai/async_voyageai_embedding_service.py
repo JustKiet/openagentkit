@@ -1,15 +1,15 @@
-from openagentkit.core.interfaces import BaseEmbeddingModel
+from openagentkit.core.interfaces import AsyncBaseEmbeddingModel
 from openagentkit.core.models.io.embeddings import EmbeddingUnit
 from openagentkit.core.models.responses import EmbeddingResponse
 from typing import Literal, Union, Optional
-from voyageai import Client
+from voyageai import AsyncClient
 import base64
 import os
 import warnings
 
-class VoyageEmbeddingModel(BaseEmbeddingModel):
+class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
     def __init__(self,
-                 client: Client = None,
+                 client: AsyncClient = None,
                  api_key: str = os.getenv("VOYAGE_API_KEY"),
                  embedding_model: Literal[
                      "voyage-3-large",
@@ -27,7 +27,7 @@ class VoyageEmbeddingModel(BaseEmbeddingModel):
         if self._client is None:
             if api_key is None:
                 raise ValueError("No API key provided. Please set the VOYAGE_API_KEY environment variable or pass it as an argument.")
-            self._client = Client(api_key=api_key)
+            self._client = AsyncClient(api_key=api_key)
         
         self._embedding_model = embedding_model
         self._encoding_format = encoding_format
@@ -164,10 +164,10 @@ class VoyageEmbeddingModel(BaseEmbeddingModel):
                 else:
                     return dimensions
     
-    def encode_query(self, 
-                     query: str, 
-                     truncation: bool = True,
-                     include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
+    async def encode_query(self, 
+                           query: str, 
+                           truncation: bool = True,
+                           include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
         """
         Encode a query into an embedding.
 
@@ -193,11 +193,11 @@ class VoyageEmbeddingModel(BaseEmbeddingModel):
         else:
             return embedding_response.embeddings[0]
 
-    def encode_texts(self, 
-                     texts: list[str], 
-                     input_type: Optional[Literal["query", "document"]] = "document",
-                     truncation: bool = True,
-                     include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
+    async def encode_texts(self, 
+                           texts: list[str], 
+                           input_type: Optional[Literal["query", "document"]] = "document",
+                           truncation: bool = True,
+                           include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
         """
         Encode texts into embeddings.
 
@@ -213,7 +213,7 @@ class VoyageEmbeddingModel(BaseEmbeddingModel):
             
             If `include_metadata` is `False`, return an `EmbeddingUnit` object containing the embedding.
         """
-        response = self._client.embed(
+        response = await self._client.embed(
             texts=texts,
             model=self.embedding_model,
             input_type=input_type,
