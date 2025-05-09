@@ -8,8 +8,6 @@ from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMS
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.core.handlers import ToolHandler
 from pydantic import BaseModel
-import datetime
-
 from mcp import ClientSession
 
 class AsyncOpenAIExecutor(AsyncBaseExecutor):
@@ -47,12 +45,12 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                  temperature: Optional[float] = 0.3,
                  max_tokens: Optional[int] = None,
                  top_p: Optional[float] = None,
-                 *args,
                  **kwargs):
+        context_history = kwargs.get("context_history", None)
+        super().__init__(system_message=system_message, context_history=context_history)
         self._llm_service = AsyncOpenAILLMService(
             client=client,
             model=model,
-            system_message=self.define_system_message(system_message),
             tools=tools,
             api_key=api_key,
             temperature=temperature,
@@ -83,7 +81,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
     @property
     def tools(self) -> List[Dict[str, Any]]:
         return self._llm_service.tools
-    
+
     async def connect_to_mcp(self, mcp_sessions: list[ClientSession]) -> None:
         self._tool_handler = await ToolHandler.from_mcp(sessions=mcp_sessions, additional_tools=self._tools, llm_provider="openai")
         self._llm_service._tool_handler = self._tool_handler
@@ -105,34 +103,6 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             max_tokens=self.max_tokens,
             top_p=self.top_p,
         )
-
-    def get_history(self) -> List[Dict[str, Any]]:
-        return self._llm_service.history
-    
-    def clear_history(self) -> list[Dict[str, Any]]:
-        """
-        Clear the chat history leaving only the system message.
-        """
-        return self._llm_service.clear_context()
-
-    def define_system_message(self, message: Optional[str] = None) -> str:
-        """
-        Define the system message for the OpenAI model.
-
-        Args:
-            message (Optional[str]): The system message to use. (default: None)
-
-        Returns:
-            str: The system message.
-        """
-        system_message = message if message is not None else """
-            System Message: You are an helpful assistant, try to assist the user in everything.\n
-            """
-        system_message += f"""
-        Current date and time: {datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n
-        
-        """
-        return system_message
 
     async def execute(self, 
                       messages: List[Dict[str, str]],
@@ -188,7 +158,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         if tools == NOT_GIVEN:
             tools = self._llm_service._tool_handler.tools
         
-        context = self._llm_service.extend_context(messages)
+        context = self.extend_context(messages)
         
         logger.debug(f"Context: {context}") if debug else None
         
@@ -209,7 +179,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
             if response.content is not None:
                 # Add the response to the context (chat history)
-                context = self._llm_service.add_context(
+                context = self.add_context(
                     {
                         "role": response.role,
                         "content": str(response.content),
@@ -220,7 +190,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             
             if response.tool_calls:
                 # Add the tool call request to the context
-                context = self._llm_service.add_context(
+                context = self.add_context(
                     {
                         "role": response.role,
                         "tool_calls": response.tool_calls,
@@ -248,7 +218,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                context = self._llm_service.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
+                context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
 
                 logger.debug(f"Context: {context}") if debug else None
             
@@ -341,7 +311,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
         stop = False
 
-        context = self._llm_service.extend_context(messages)
+        context = self.extend_context(messages)
 
         while not stop:
             logger.debug(f"Context: {context}") if debug else None
@@ -361,7 +331,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             async for chunk in response_generator:
                 if chunk.finish_reason == "tool_calls":
                     # Add the llm tool call request to the context
-                    context = self._llm_service.add_context(
+                    context = self.add_context(
                         {
                             "role": "assistant",
                             "tool_calls": chunk.tool_calls,
@@ -397,14 +367,14 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                     logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                    context = self._llm_service.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
+                    context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
                     
                     logger.debug(f"Context in Stream Execute: {context}") if debug else None
 
                 elif chunk.finish_reason == "stop":
                     logger.debug(f"Final Chunk: {chunk}") if debug else None
                     if chunk.content:
-                        context = self._llm_service.add_context(
+                        context = self.add_context(
                             {
                                 "role": "assistant",
                                 "content": str(chunk.content),

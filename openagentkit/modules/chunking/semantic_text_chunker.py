@@ -182,6 +182,10 @@ class SemanticTextChunker(BaseChunker):
             
         splits = self._combine_splits(splits, self.buffer_size)
 
+        if len(splits) <= 1:
+            combined_text = ' '.join([d.content for d in splits])
+            return [combined_text] if combined_text.strip() else []
+
         embeddings = self.embedding_model.encode_texts([split.combined_splits for split in splits])
 
         distances = self._calculate_cosine_similarities(embeddings)
@@ -192,6 +196,13 @@ class SemanticTextChunker(BaseChunker):
         indices_above_thresh = [i for i, x in enumerate(distances) if x > breakpoint_distance_threshold]
 
         chunks = []
+
+        if not indices_above_thresh:
+            combined_text = ' '.join([d.content for d in splits])
+            if combined_text.strip():
+                chunks.append(combined_text)
+            return chunks
+            
         # Iterate over pairs of breakpoints
         for i in range(len(indices_above_thresh) - 1):
             start = indices_above_thresh[i]

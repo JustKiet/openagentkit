@@ -17,6 +17,41 @@ class BaseExecutor(ABC):
 
         `stream_execute()`: An abstract method to stream execute a user message with the given tools and parameters.
     """
+    def __init__(self,
+                 system_message: Optional[str] = None, 
+                 context_history: Optional[List[Dict[str, str]]] = None):
+        self._system_message = system_message or "You are a helpful assistant. Try to assist the user as best as you can. If you are unsure, ask clarifying questions. If you don't know the answer, say 'I don't know'."
+
+        self._context_history = [
+            {
+                "role": "system",
+                "content": self._system_message,
+            }
+        ]
+
+        if context_history is not None:
+            self._context_history = context_history
+
+    @property
+    def system_message(self) -> str:
+        """
+        Get the system message.
+
+        Returns:
+            The system message.
+        """
+        return self._system_message
+    
+    @system_message.setter
+    def system_message(self, value: str):
+        """
+        Set the system message.
+
+        Args:
+            value: The system message to set.
+        """
+        self._system_message = value
+        self._context_history[0]["content"] = value
 
     @abstractmethod
     def clone(self) -> 'BaseExecutor':
@@ -25,19 +60,6 @@ class BaseExecutor(ABC):
         
         Returns:
             BaseExecutor: A clone of the executor instance.
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def define_system_message(self, system_message: Optional[str]) -> str:
-        """
-        An abstract method to define the system message for the executor.
-
-        Args:
-            system_message (Optional[str]): The system message to be defined.
-        
-        Returns:
-            str: The defined system message.
         """
         raise NotImplementedError
 
@@ -86,12 +108,58 @@ class BaseExecutor(ABC):
         """
         raise NotImplementedError
     
-    @abstractmethod
-    def get_history(self) -> List[Dict[str, Any]]:
+    def get_context(self) -> List[Dict[str, Any]]:
         """
         An abstract method to get the history of the conversation.
 
         Returns:
             List[Dict[str, Any]]: The history of the conversation.
         """
-        raise NotImplementedError
+        return self._context_history
+    
+    def add_context(self, content: dict[str, str]):
+        """
+        Add context to the model.
+
+        Args:
+            content: The content to add to the context.
+
+        Returns:
+            The context history.
+        """
+        if not content:
+            return self._context_history
+        
+        self._context_history.append(content)
+        return self._context_history
+    
+    def extend_context(self, content: List[dict[str, str]]):
+        """
+        Extend the context of the model.
+
+        Args:
+            content: The content to extend the context with.
+
+        Returns:
+            The context history.
+        """
+        if not content:
+            return self._context_history
+        
+        self._context_history.extend(content)
+        return self._context_history
+    
+    def clear_context(self):
+        """
+        Clear the context of the model leaving only the system message.
+
+        Returns:
+            The cleared context history.
+        """
+        self._context_history = [
+            {
+                "role": "system",
+                "content": self._system_message,
+            }
+        ]
+        return self._context_history

@@ -12,6 +12,7 @@ from typing import Callable, Literal
 from openagentkit.core.handlers.tool_handler import ToolHandler
 from loguru import logger
 import asyncio
+import uuid
 
 class OpenAIRealtimeService(AsyncBaseLLMModel):
     def __init__(self, 
@@ -20,6 +21,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                  voice: Literal["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"] = "alloy",
                  system_message: Optional[str] = None,
                  tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
+                 timeout: float = 60.0,
                  api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
                  temperature: Optional[float] = 0.3,
                  max_tokens: Optional[int] = None,
@@ -44,6 +46,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
         self._tool_handler = ToolHandler(
             tools=tools, llm_provider="openai", schema_type="OpenAIRealtime"
         )
+        self.timeout = timeout
         self._api_key = api_key
         self.connection = None
         self._event_queue = asyncio.Queue()
@@ -87,6 +90,12 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 logger.info(f"{event}")
             case "conversation.item.input_audio_transcription.completed":
                 logger.info(f"{event}")
+                return OpenAgentStreamingResponse(
+                    role="user",
+                    index=event.content_index,
+                    finish_reason="transcription",
+                    content=event.transcript,
+                )
             case "conversation.item.input_audio_transcription.delta":
                 logger.info(f"{event}")
             case "conversation.item.input_audio_transcription.failed":
@@ -94,6 +103,8 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             case "conversation.item.truncated":
                 logger.info(f"{event}")
             case "conversation.item.deleted":
+                logger.info(f"{event}")
+            case "conversation.item.retrieved":
                 logger.info(f"{event}")
     
     def _handle_input_audio_buffer_event(self, event: RealtimeServerEvent):
@@ -119,28 +130,8 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 logger.info(f"{event}")
             case "response.done":
                 logger.info(f"{event}")
-                if event.response.output[0].type == "message":
-                    return OpenAgentStreamingResponse(
-                        role="assistant",
-                        content=event.response.output[0].content[0].text,
-                        finish_reason="stop",
-                        usage=UsageResponse(
-                            prompt_tokens=event.response.usage.input_tokens,
-                            completion_tokens=event.response.usage.output_tokens,
-                            total_tokens=event.response.usage.total_tokens,
-                            prompt_tokens_details=PromptTokensDetails(
-                                cached_tokens=event.response.usage.input_token_details.cached_tokens,
-                                audio_tokens=event.response.usage.input_token_details.audio_tokens,
-                            ), 
-                            completion_tokens_details=CompletionTokensDetails(
-                                audio_tokens=event.response.usage.output_token_details.audio_tokens, # TODO: This is missing a bunch of fields
-                                reasoning_tokens=0,
-                                accepted_prediction_tokens=0,
-                                rejected_prediction_tokens=0, # TODO: This is missing a bunch of fields
-                            )
-                        )
-                    )
                 
+                message = ""
                 tool_calls = []
                 for i in range(len(event.response.output)):
                     if event.response.output[i].type == "function_call":
@@ -154,12 +145,14 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                                 }
                             }
                         )
+                    elif event.response.output[i].type == "message":
+                        message = event.response.output[i].content[0].text
 
                 return OpenAgentStreamingResponse(
                     role="assistant",
-                    content="",
+                    content=message,
                     tool_calls=tool_calls,
-                    finish_reason="tool_calls",
+                    finish_reason="tool_calls" if tool_calls else "stop",
                     usage=UsageResponse(
                         prompt_tokens=event.response.usage.input_tokens,
                         completion_tokens=event.response.usage.output_tokens,
@@ -189,7 +182,6 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             case "response.text.done":
                 logger.info(f"{event}")
             case "response.audio_transcript.delta":
-                logger.info(f"{event}")
                 return OpenAgentStreamingResponse(
                     role="assistant",
                     index=event.content_index,
@@ -202,7 +194,6 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                     content=event.transcript,    
                 )
             case "response.audio.delta":
-                logger.info(f"{event}")
                 return OpenAgentStreamingResponse(
                     role="assistant",
                     index=event.content_index,
@@ -244,6 +235,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                     return None
                 case "rate_limits":
                     logger.warning(f"Unhandled rate limits event: {event.type}")
+                    logger.warning(f"Rate limits Event: {event}")
                     return None
                 case _:
                     logger.warning(f"Unknown event type: {event.type}")
@@ -256,7 +248,8 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
         """Continuously listen for events from the WebSocket connection"""
         try:
             async for event in self.connection:
-                logger.debug(f"Received event: {event}")
+                if event.type != "response.audio.delta":
+                    logger.debug(f"Received event: {event.type}")
                 await self._event_queue.put(event)
         except Exception as e:
             logger.error(f"Error in event listener: {str(e)}")
@@ -293,17 +286,25 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 # Update session configuration
                 session_config = {
                     "modalities": ["text", "audio"],
+                    "instructions": self._system_message,
+                    "input_audio_transcription": {
+                        "model": "gpt-4o-transcribe",
+                        "prompt": "The following speech is a user query to a Mall Kiosk AI assistant at The Mall Group. It could mention a specific mall ('Bangkae', 'Bangkapi', 'Thapra', 'Korat', 'EmQuartier', 'Emdistrict', 'Emsphere', 'MLifeStore', 'BluePort', 'Bangkok Mall'), a promotion, or a credit card. ('SCB', 'KTC', 'Krungsri', 'KBank', 'Krungthai Bank', 'Bangkok Bank', 'CardX', 'MCard').",
+                    },
                     "voice": self._voice,
                     "model": self._model,
                     "turn_detection": {
                         "type": "server_vad",
-                        "prefix_padding_ms": 300,
-                        "silence_duration_ms": 200,
                         "threshold": 0.5,
+                        "prefix_padding_ms": 300,
+                        "silence_duration_ms": 500,
                         "create_response": True,
-                        "interrupt_response": True
                     },
-                    "tools": self._tool_handler.tools
+                    "input_audio_noise_reduction": {
+                        "type": "near_field"
+                    },
+                    "tools": self._tool_handler.tools,
+                    "temperature": self._temperature,
                 }
                 
                 logger.debug(f"Updating session with config: {session_config}")
@@ -341,22 +342,27 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
 
         try:
             message = messages[-1]
-            logger.info(f"Sending message: {message}")
+
+            if audio:
+                content_payload = ConversationItemContentParam(
+                    type="input_audio",
+                    audio=message["content"]
+                )
+            else:
+                content_payload = ConversationItemContentParam(
+                    type="input_text",
+                    text=message["content"]
+                )
 
             await self.connection.conversation.item.create(
                 item=ConversationItemParam(
                     type="message",
                     role=message["role"],
                     content=[
-                        ConversationItemContentParam(
-                            type="input_audio" if audio else "input_text",
-                            text=message["content"]
-                        )
+                        content_payload 
                     ]
                 )
             )
-
-            print(f"Sending message: {message['content']}")
 
             await self.connection.response.create()
 
@@ -364,12 +370,15 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             # Yield responses as they come in
             while self._is_connected:
                 try:
-                    response = await asyncio.wait_for(self._response_queue.get(), timeout=30.0)
+                    response = await asyncio.wait_for(self._response_queue.get(), timeout=self.timeout)
                     response = cast(OpenAgentStreamingResponse, response)
                     if response.tool_calls:
+                        logger.debug(f"Tool calls detected: {response.tool_calls}")
                         tool_response = await self._tool_handler.async_handle_tool_request(
                             response=response,
                         )
+
+                        logger.debug(f"Tool response received: {tool_response}")
 
                         await self.connection.conversation.item.create(
                             item=ConversationItemParam(
@@ -381,7 +390,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
 
                         await self.connection.response.create()
 
-                        final_response = await asyncio.wait_for(self._response_queue.get(), timeout=30.0)
+                        final_response = await asyncio.wait_for(self._response_queue.get(), timeout=self.timeout)
                         final_response = cast(OpenAgentStreamingResponse, final_response)
                         yield final_response
                     else:

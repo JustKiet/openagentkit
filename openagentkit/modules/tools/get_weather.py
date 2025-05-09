@@ -156,10 +156,7 @@ def extract_forecast(weather_data: dict) -> list:
     
     return forecasts_response
 
-@tool(
-    description="Get the weather forecast for a location. If no location is provided, the location will automatically be determined using the IP address.",
-    _notification=True,
-)
+@tool
 def get_weather_tool(
     mode: Annotated[Literal["current", "forecast", "both"], "Weather Response mode."],
     location: Annotated[Union[str, Literal["Unknown"]], "The location to get the weather forecast for."], 
@@ -187,7 +184,7 @@ def get_weather_tool(
     if not weather_api_key:
         logger.error("Weather API key not found in environment variables")
         return WeatherResponse(
-            location="Unknown",
+            location="Weather API key not configured. Service unavailable.",
             current_weather=None,
             forecast=None,
             error="Weather API key not configured"
