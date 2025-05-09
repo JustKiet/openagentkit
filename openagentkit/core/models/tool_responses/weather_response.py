@@ -22,3 +22,4 @@ class WeatherResponse(BaseModel):
     location: Optional[str]
     current_weather: Optional[CurrentWeather]
     forecast: Optional[List[WeatherForecast]]
+    error: Optional[str] = None
