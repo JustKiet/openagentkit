@@ -6,3 +6,4 @@ websockets
 scipy
 pymilvus
 mcp[cli]
+voyageai

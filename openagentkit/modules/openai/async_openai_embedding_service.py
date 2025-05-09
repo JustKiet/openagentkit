@@ -1,13 +1,13 @@
 import tiktoken
-from openai import OpenAI
-from openagentkit.core.interfaces.base_embedding_model import BaseEmbeddingModel
+from openai import AsyncOpenAI
+from openagentkit.core.interfaces.async_base_embedding_model import AsyncBaseEmbeddingModel
 from openagentkit.core.models.io.embeddings import EmbeddingUnit
 from openagentkit.core.models.responses import EmbeddingResponse
 from typing import Literal, Union
 
-class OpenAIEmbeddingModel(BaseEmbeddingModel):
+class AsyncOpenAIEmbeddingModel(AsyncBaseEmbeddingModel):
     def __init__(self, 
-                 client: OpenAI,
+                 client: AsyncOpenAI,
                  embedding_model: Literal[
                      "text-embedding-3-small", 
                      "text-embedding-3-large", 
@@ -15,19 +15,19 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                  ] = "text-embedding-3-small",
                  embedding_encoding: str = "cl100k_base",
                  encoding_format: Literal["float", "base64"] = "float"):
-        self.client = client
-        self.embedding_model = embedding_model
-        self.embedding_encoding = embedding_encoding
-        self.encoding_format = encoding_format
+        self._client = client
+        self._embedding_model = embedding_model
+        self._embedding_encoding = embedding_encoding
+        self._encoding_format = encoding_format
 
         match self.embedding_model:
             case "text-embedding-3-small":
-                self.dimensions = 1536
+                self._dimensions = 1536
             case "text-embedding-3-large":
-                self.dimensions = 3072
+                self._dimensions = 3072
             case "text-embedding-ada-002":
-                self.dimensions = 1536
-    
+                self._dimensions = 1536
+
     @property
     def _embedding_model(self) -> str:
         """
@@ -95,9 +95,9 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         self._encoding_format = value
         return self._encoding_format
 
-    def encode_query(self, 
-                     query: str,
-                     include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
+    async def encode_query(self, 
+                           query: str,
+                           include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
         """
         Encode a query into an embedding.
 
@@ -137,7 +137,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             embedding_model: str = embedding_response.embedding_model
             ```
         """
-        embedding_response: EmbeddingResponse = self.encode_texts(
+        embedding_response: EmbeddingResponse = await self.encode_texts(
             texts=[query],
             include_metadata=True
         )
@@ -147,9 +147,9 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         else:
             return embedding_response.embeddings[0]
 
-    def encode_texts(self, 
-                     texts: list[str],
-                     include_metadata: bool = False) -> Union[list[EmbeddingUnit], EmbeddingResponse]:
+    async def encode_texts(self, 
+                           texts: list[str],
+                           include_metadata: bool = False) -> Union[list[EmbeddingUnit], EmbeddingResponse]:
         """
         Encode a list of texts into a list of embeddings.
         Args:
@@ -192,7 +192,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             text = text.replace("\n", " ")
             formatted_texts.append(text)
 
-        response = self.client.embeddings.create(
+        response = await self.client.embeddings.create(
             model=self.embedding_model,
             input=formatted_texts,
             encoding_format=self.encoding_format,
