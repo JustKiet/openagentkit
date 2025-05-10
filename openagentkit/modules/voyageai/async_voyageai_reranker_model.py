@@ -73,16 +73,16 @@ class AsyncVoyageAIRerankerModel(BaseRerankerModel):
                 RerankingUnit(
                     index=item.index,
                     content=item.document,
-                    score=item.score,
+                    relevance_score=item.relevance_score,
                 )
             )
 
         if include_metadata:
             return RerankingResponse(
                 query=query,
-                reranking_units=reranking_units,
-                model=self._reranking_model,
-                metadata=response.metadata
+                results=reranking_units,
+                reranking_model=self._reranking_model,
+                total_tokens=response.total_tokens,   
             )
         else:
             return reranking_units

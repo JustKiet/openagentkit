@@ -6,6 +6,7 @@ from voyageai import Client
 import base64
 import os
 import warnings
+import struct
 
 class VoyageAIEmbeddingModel(BaseEmbeddingModel):
     def __init__(self,
@@ -22,7 +23,6 @@ class VoyageAIEmbeddingModel(BaseEmbeddingModel):
                  ] = "voyage-3-large",
                  dimensions: Literal[256, 512, 1024, 1536, 2048] = 1024,
                  encoding_format: Literal["float", "base64"] = "float"):
-        super().__init__(encoding_format=encoding_format)
         self._client = client
         if self._client is None:
             if api_key is None:
@@ -173,6 +173,7 @@ class VoyageAIEmbeddingModel(BaseEmbeddingModel):
 
         Args:
             query (str): The query to encode.
+            truncation (bool): Whether to truncate the query. Default is True.
             include_metadata (bool): Whether to include metadata in the response.
 
         Returns:
@@ -192,6 +193,22 @@ class VoyageAIEmbeddingModel(BaseEmbeddingModel):
             return embedding_response
         else:
             return embedding_response.embeddings[0]
+        
+    def _handle_base64_encoding(
+        self, 
+        embedding: list[float],
+    ) -> str:
+        """
+        Handle base64 encoding of the embedding.
+        
+        Args:
+            embedding (bytes): The embedding to encode.
+        
+        Returns:
+            str: The base64 encoded string.
+        """
+        embedding = struct.pack(f"{len(embedding)}f", *embedding)
+        return base64.b64encode(embedding).decode("utf-8")
 
     def encode_texts(self, 
                      texts: list[str], 
@@ -226,7 +243,7 @@ class VoyageAIEmbeddingModel(BaseEmbeddingModel):
 
         for idx, embedding in enumerate(response.embeddings):
             if self.encoding_format == "base64":
-                embedding = base64.b64encode(embedding).decode("utf-8")
+                embedding = self._handle_base64_encoding(embedding)
             
             embedding_units.append(
                 EmbeddingUnit(

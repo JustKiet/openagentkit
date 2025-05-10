@@ -6,6 +6,7 @@ from voyageai import AsyncClient
 import base64
 import os
 import warnings
+import struct
 
 class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
     def __init__(self,
@@ -22,7 +23,6 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
                  ] = "voyage-3-large",
                  dimensions: Literal[256, 512, 1024, 1536, 2048] = 1024,
                  encoding_format: Literal["float", "base64"] = "float"):
-        super().__init__(encoding_format=encoding_format)
         self._client = client
         if self._client is None:
             if api_key is None:
@@ -181,7 +181,7 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
             
             If `include_metadata` is `False`, return an `EmbeddingUnit` object containing the embedding.
         """
-        embedding_response: EmbeddingResponse = self.encode_texts(
+        embedding_response: EmbeddingResponse = await self.encode_texts(
             texts=[query],
             input_type="query",
             truncation=truncation,
@@ -192,6 +192,22 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
             return embedding_response
         else:
             return embedding_response.embeddings[0]
+        
+    def _handle_base64_encoding(
+        self, 
+        embedding: list[float],
+    ) -> str:
+        """
+        Handle base64 encoding of the embedding.
+        
+        Args:
+            embedding (bytes): The embedding to encode.
+        
+        Returns:
+            str: The base64 encoded string.
+        """
+        embedding = struct.pack(f"{len(embedding)}f", *embedding)
+        return base64.b64encode(embedding).decode("utf-8")
 
     async def encode_texts(self, 
                            texts: list[str], 
@@ -226,7 +242,7 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
 
         for idx, embedding in enumerate(response.embeddings):
             if self.encoding_format == "base64":
-                embedding = base64.b64encode(embedding).decode("utf-8")
+                embedding = self._handle_base64_encoding(embedding)
             
             embedding_units.append(
                 EmbeddingUnit(

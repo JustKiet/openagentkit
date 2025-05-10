@@ -17,7 +17,6 @@ class AsyncOpenAIEmbeddingModel(AsyncBaseEmbeddingModel):
                  ] = "text-embedding-3-small",
                  embedding_encoding: str = "cl100k_base",
                  encoding_format: Literal["float", "base64"] = "float"):
-        super().__init__(encoding_format=encoding_format)
         self._client = client
         if self.client is None:
             if api_key is None:
@@ -26,6 +25,7 @@ class AsyncOpenAIEmbeddingModel(AsyncBaseEmbeddingModel):
 
         self._embedding_model = embedding_model
         self._embedding_encoding = embedding_encoding
+        self._encoding_format=encoding_format
 
         match self.embedding_model:
             case "text-embedding-3-small":
