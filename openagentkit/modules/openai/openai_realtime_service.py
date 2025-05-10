@@ -289,7 +289,6 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                     "instructions": self._system_message,
                     "input_audio_transcription": {
                         "model": "gpt-4o-transcribe",
-                        "prompt": "The following speech is a user query to a Mall Kiosk AI assistant at The Mall Group. It could mention a specific mall ('Bangkae', 'Bangkapi', 'Thapra', 'Korat', 'EmQuartier', 'Emdistrict', 'Emsphere', 'MLifeStore', 'BluePort', 'Bangkok Mall'), a promotion, or a credit card. ('SCB', 'KTC', 'Krungsri', 'KBank', 'Krungthai Bank', 'Bangkok Bank', 'CardX', 'MCard').",
                     },
                     "voice": self._voice,
                     "model": self._model,
