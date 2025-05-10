@@ -21,7 +21,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ```bash
 pip install -i https://test.pypi.org/simple/ \
             --extra-index-url https://pypi.org/simple \
-            openagentkit==0.1.0.dev18
+            openagentkit==0.1.0.dev19
 ```
 
 ## Quick Start
