@@ -5,25 +5,24 @@ from openai.types.beta.realtime import *
 from openagentkit.core.models.responses import OpenAgentStreamingResponse
 from openagentkit.core.models.responses import UsageResponse, PromptTokensDetails, CompletionTokensDetails
 from openagentkit.core.interfaces import AsyncBaseLLMModel
-
+from openagentkit.core.utils.tool_wrapper import ToolWrapper
+from openagentkit.modules.openai import OpenAIAudioVoices
 import os
 from openai._types import NOT_GIVEN
-from typing import Callable, Literal
 from openagentkit.core.handlers.tool_handler import ToolHandler
 from loguru import logger
 import asyncio
-import uuid
 
 class OpenAIRealtimeService(AsyncBaseLLMModel):
     def __init__(self, 
-                 client: AsyncOpenAI = None,
+                 client: Optional[AsyncOpenAI] = None,
                  model: str = "gpt-4o-mini-realtime-preview",
-                 voice: Literal["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"] = "alloy",
+                 voice: OpenAIAudioVoices = "alloy",
                  system_message: Optional[str] = None,
-                 tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
+                 tools: Optional[List[ToolWrapper]] = None,
                  timeout: float = 60.0,
                  api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-                 temperature: Optional[float] = 0.3,
+                 temperature: Optional[float] = 0.8,
                  max_tokens: Optional[int] = None,
                  top_p: Optional[float] = None):
         super().__init__(
@@ -31,16 +30,17 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             max_tokens=max_tokens,
             top_p=top_p
         )
-        self._client = client
-        if self._client is None:
+        if client is None:
             if api_key is None:
                 raise ValueError("No API key provided. Please set the OPENAI_API_KEY environment variable or pass it as an argument.")
             self._client = AsyncOpenAI(
                 api_key=api_key,
             )
+        else:
+            self._client = client
 
         self._model = model
-        self._voice = voice
+        self._voice: OpenAIAudioVoices = voice
         self._system_message = system_message
         self._tools = tools
         self._tool_handler = ToolHandler(
@@ -106,6 +106,8 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 logger.info(f"{event}")
             case "conversation.item.retrieved":
                 logger.info(f"{event}")
+            case _:
+                logger.warning(f"Unhandled conversation event type: {event.type}")
     
     def _handle_input_audio_buffer_event(self, event: RealtimeServerEvent):
         if not event.type.split(".")[0] == "input_audio_buffer":
@@ -120,6 +122,8 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 logger.info(f"{event}")
             case "input_audio_buffer.speech_stopped":
                 logger.info(f"{event}")
+            case _:
+                logger.warning(f"Unhandled input audio buffer event type: {event.type}")
 
     def _handle_response_event(self, event: RealtimeServerEvent):
         if not event.type.split(".")[0] == "response":
@@ -133,6 +137,9 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 
                 message = ""
                 tool_calls = []
+                if event.response.output is None:
+                    raise ValueError("No output in response event")
+                
                 for i in range(len(event.response.output)):
                     if event.response.output[i].type == "function_call":
                         tool_calls.append(
@@ -205,6 +212,8 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                 logger.info(f"{event}")
             case "response.function_call_arguments.done":
                 logger.info(f"{event}")
+            case _:
+                logger.warning(f"Unhandled response event type: {event.type}")
 
     def _handle_error_event(self, event: RealtimeServerEvent):
         """Handle error events"""
@@ -367,6 +376,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
             await self.connection.response.create()
 
             logger.info("Response created")
+            stop = False
             # Yield responses as they come in
             while self._is_connected:
                 try:
@@ -374,8 +384,14 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                     response = cast(OpenAgentStreamingResponse, response)
                     if response.tool_calls:
                         logger.debug(f"Tool calls detected: {response.tool_calls}")
+                        
                         tool_response = await self._tool_handler.async_handle_tool_request(
                             response=response,
+                        )
+
+                        yield OpenAgentStreamingResponse(
+                            role="tool",
+                            tool_results=tool_response.tool_results
                         )
 
                         logger.debug(f"Tool response received: {tool_response}")
@@ -389,10 +405,6 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                         )
 
                         await self.connection.response.create()
-
-                        final_response = await asyncio.wait_for(self._response_queue.get(), timeout=self.timeout)
-                        final_response = cast(OpenAgentStreamingResponse, final_response)
-                        yield final_response
                     else:
                         yield response
                 except asyncio.TimeoutError:

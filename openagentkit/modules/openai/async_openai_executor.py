@@ -1,4 +1,4 @@
-from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional
 import os
 from loguru import logger
 from openai._types import NOT_GIVEN
@@ -7,6 +7,8 @@ from openagentkit.core.interfaces.async_base_executor import AsyncBaseExecutor
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.core.handlers import ToolHandler
+from openagentkit.core.utils.tool_wrapper import ToolWrapper
+from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from pydantic import BaseModel
 from mcp import ClientSession
 
@@ -37,15 +39,15 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
     """
     def __init__(self,
-                 client: AsyncOpenAI = None,
+                 client: Optional[AsyncOpenAI] = None,
                  model: str = "gpt-4o-mini",
                  system_message: Optional[str] = None,
-                 tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
+                 tools: Optional[List[ToolWrapper]] = None,
                  api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-                 temperature: Optional[float] = 0.3,
+                 temperature: Optional[float] = None,
                  max_tokens: Optional[int] = None,
                  top_p: Optional[float] = None,
-                 **kwargs):
+                 **kwargs: Any):
         context_history = kwargs.get("context_history", None)
         super().__init__(system_message=system_message, context_history=context_history)
         self._llm_service = AsyncOpenAILLMService(
@@ -71,20 +73,20 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         return self._llm_service.temperature
 
     @property
-    def max_tokens(self) -> int:
+    def max_tokens(self) -> int | None:
         return self._llm_service.max_tokens
     
     @property
-    def top_p(self) -> float:
+    def top_p(self) -> float | None:
         return self._llm_service.top_p
     
     @property
-    def tools(self) -> List[Dict[str, Any]]:
+    def tools(self) -> List[Dict[str, Any]] | None:
         return self._llm_service.tools
 
     async def connect_to_mcp(self, mcp_sessions: list[ClientSession]) -> None:
         self._tool_handler = await ToolHandler.from_mcp(sessions=mcp_sessions, additional_tools=self._tools, llm_provider="openai")
-        self._llm_service._tool_handler = self._tool_handler
+        self._llm_service.tool_handler = self._tool_handler
     
     def clone(self) -> 'AsyncOpenAIExecutor':
         """
@@ -94,11 +96,11 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             A new AsyncOpenAIExecutor object with the same parameters.
         """
         return AsyncOpenAIExecutor(
-            client=self._llm_service._client,
-            model=self._llm_service._model,
-            system_message=self._llm_service._system_message,
+            client=self._llm_service.client,
+            model=self._llm_service.model,
+            system_message=self._system_message,
             tools=self._tools,
-            api_key=self._llm_service._api_key,
+            api_key=self._llm_service.api_key,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             top_p=self.top_p,
@@ -106,12 +108,15 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
     async def execute(self, 
                       messages: List[Dict[str, str]],
-                      tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
-                      response_schema: Optional[BaseModel] = NOT_GIVEN,
+                      tools: Optional[List[Dict[str, Any]]] = None,
                       temperature: Optional[float] = None,
                       max_tokens: Optional[int] = None,
                       top_p: Optional[float] = None,
-                      **kwargs,
+                      response_schema: Optional[type[BaseModel]] = None,
+                      audio: Optional[bool] = False,
+                      audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+                      audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+                      **kwargs: Any,
                     ) -> AsyncGenerator[OpenAgentResponse, None]:
         """
         Asynchronously execute the OpenAI model and return an OpenAgentResponse object.
@@ -119,10 +124,13 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         Args:
             messages (List[Dict[str, str]]): The messages to send to the model.
             tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
-            response_schema (Optional[BaseModel]): The schema to use in the response.
+            response_schema (Optional[type[BaseModel]]): The schema to use in the response.
             temperature (Optional[float]): The temperature to use in the response.
             max_tokens (Optional[int]): The maximum number of tokens to use in the response.
             top_p (Optional[float]): The top p to use in the response.
+            audio (Optional[bool]): Whether to use audio in the response.
+            audio_format (Optional[Literal['wav', 'mp3', 'flac', 'opus', 'pcm16']]): The format to use in the response.
+            audio_voice (Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]]): The voice to use in the response.
 
         Returns:
             An OpenAgentResponse asynchronous generator.
@@ -156,9 +164,9 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         debug = kwargs.get("debug", False)
         
         if tools == NOT_GIVEN:
-            tools = self._llm_service._tool_handler.tools
+            tools = self._llm_service.tool_handler.tools
         
-        context = self.extend_context(messages)
+        context: list[dict[str, Any]] = await self.extend_context(messages)
         
         logger.debug(f"Context: {context}") if debug else None
         
@@ -173,27 +181,31 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
+                audio=audio,
+                audio_format=audio_format,
+                audio_voice=audio_voice,
             )
 
             logger.info(f"Response Received: {response}") if debug else None
 
             if response.content is not None:
                 # Add the response to the context (chat history)
-                context = self.add_context(
+                context = await self.add_context(
                     {
                         "role": response.role,
                         "content": str(response.content),
                     }
                 )
 
-            tool_results = []
+            tool_results: list[Any] = []
             
             if response.tool_calls:
+                tool_calls: list[dict[str, str]] = [tool_call.model_dump() for tool_call in response.tool_calls]
                 # Add the tool call request to the context
-                context = self.add_context(
+                context = await self.add_context(
                     {
                         "role": response.role,
-                        "tool_calls": response.tool_calls,
+                        "tool_calls": tool_calls,
                         "content": str(response.content),
                     }
                 )
@@ -218,7 +230,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
+                context = await self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
 
                 logger.debug(f"Context: {context}") if debug else None
             
@@ -249,15 +261,15 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
     async def stream_execute(self, 
                              messages: List[Dict[str, str]],
-                             tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
-                             response_schema: Optional[BaseModel] = NOT_GIVEN,
+                             tools: Optional[List[Dict[str, Any]]] = None,
                              temperature: Optional[float] = None,
                              max_tokens: Optional[int] = None,
                              top_p: Optional[float] = None,
+                             response_schema: Optional[type[BaseModel]] = None,
                              audio: Optional[bool] = False,
-                             audio_format: Optional[str] = "pcm16",
-                             audio_voice: Optional[str] = "alloy",
-                             **kwargs,
+                             audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+                             audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+                             **kwargs: Any,
                              ) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
         """
         Asynchronously stream the OpenAI model and return an OpenAgentStreamingResponse object.
@@ -270,8 +282,8 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             max_tokens (Optional[int]): The maximum number of tokens to use in the response.
             top_p (Optional[float]): The top p to use in the response.
             audio (Optional[bool]): Whether to use audio in the response.
-            audio_format (Optional[str]): The format to use in the response.
-            audio_voice (Optional[str]): The voice to use in the response.
+            audio_format (Optional[Literal['wav', 'mp3', 'flac', 'opus', 'pcm16']]): The format to use in the response.
+            audio_voice (Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]]): The voice to use in the response.
 
         Returns:
             An OpenAgentStreamingResponse asynchronous generator.
@@ -311,7 +323,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
         stop = False
 
-        context = self.extend_context(messages)
+        context: list[dict[str, Any]] = await self.extend_context(messages)
 
         while not stop:
             logger.debug(f"Context: {context}") if debug else None
@@ -330,11 +342,12 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             
             async for chunk in response_generator:
                 if chunk.finish_reason == "tool_calls":
+                    tool_calls: list[dict[str, Any]] = [tool_call.model_dump() for tool_call in chunk.tool_calls] if chunk.tool_calls else []
                     # Add the llm tool call request to the context
-                    context = self.add_context(
+                    context = await self.add_context(
                         {
                             "role": "assistant",
-                            "tool_calls": chunk.tool_calls,
+                            "tool_calls": tool_calls,
                             "content": str(chunk.content),
                         }
                     )
@@ -367,14 +380,14 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                     logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                    context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
+                    context = await self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
                     
                     logger.debug(f"Context in Stream Execute: {context}") if debug else None
 
                 elif chunk.finish_reason == "stop":
                     logger.debug(f"Final Chunk: {chunk}") if debug else None
                     if chunk.content:
-                        context = self.add_context(
+                        context = await self.add_context(
                             {
                                 "role": "assistant",
                                 "content": str(chunk.content),

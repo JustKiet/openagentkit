@@ -1,7 +1,7 @@
 from openagentkit.core.models.io.embeddings import EmbeddingUnit, EmbeddingSplits
 from openagentkit.core.interfaces import BaseChunker, BaseEmbeddingModel
 from scipy.spatial.distance import cosine
-from typing import Literal
+from typing import Literal, Optional, Union
 import numpy as np
 import re
 
@@ -36,14 +36,14 @@ class SemanticTextChunker(BaseChunker):
         list[str]: A list of chunks.
     """
     def __init__(self, 
-                 embedding_model: BaseEmbeddingModel,
+                 embedding_model: Union[BaseEmbeddingModel[int], BaseEmbeddingModel[str]],
                  breakpoint_threshold_type: Literal[
                      "percentile", 
                      "standard_deviation", 
                      "interquartile", 
                      "gradient"
                  ] = "percentile",
-                 breakpoint_threshold_amount: int = 95,
+                 breakpoint_threshold_amount: Optional[int] = None,
                  regex_pattern: str = r'(?<=[.?!])\s+',
                  buffer_size: int = 1):
         self.embedding_model = embedding_model
@@ -115,7 +115,7 @@ class SemanticTextChunker(BaseChunker):
 
         return splits
     
-    def _calculate_cosine_similarities(self, embedding_units: list[EmbeddingUnit]) -> list[np.float64]:
+    def _calculate_cosine_similarities(self, embedding_units: list[EmbeddingUnit]) -> list[float]:
         """
         Calculate the cosine similarity of the embeddings of the splits.
 
@@ -123,9 +123,9 @@ class SemanticTextChunker(BaseChunker):
             embedding_units: The embeddings of the splits.
 
         Returns:
-            list[np.float64]: A list of cosine similarity scores.
+            list[float]: A list of cosine similarity scores.
         """
-        similarity_scores = []
+        similarity_scores: list[float] = []
         for i in range(len(embedding_units) - 1):
             embedding_current = embedding_units[i].embedding
             embedding_next = embedding_units[i + 1].embedding
@@ -150,10 +150,10 @@ class SemanticTextChunker(BaseChunker):
         """
         match self.breakpoint_threshold_type:
             case "percentile":
-                return np.percentile(distances, self.breakpoint_threshold_amount)
+                return float(np.percentile(distances, self.breakpoint_threshold_amount)) # type: ignore
             
             case "standard_deviation":
-                return np.mean(distances) + self.breakpoint_threshold_amount * np.std(distances)
+                return float(np.mean(distances) + self.breakpoint_threshold_amount * np.std(distances)) # type: ignore
             
             case "interquartile":
                 q1, q3 = np.percentile(distances, [25, 75])
@@ -163,7 +163,7 @@ class SemanticTextChunker(BaseChunker):
             case "gradient":
                 # Calculate the threshold based on the distribution of gradient of distance array
                 distance_gradient = np.gradient(distances, range(0, len(distances)))
-                return np.percentile(distance_gradient, self.breakpoint_threshold_amount)
+                return float(np.percentile(distance_gradient, self.breakpoint_threshold_amount)) # type: ignore
             
             case _:
                 raise ValueError(f"Got unexpected `breakpoint_threshold_type`: {self.breakpoint_threshold_type}")
@@ -186,16 +186,19 @@ class SemanticTextChunker(BaseChunker):
             combined_text = ' '.join([d.content for d in splits])
             return [combined_text] if combined_text.strip() else []
 
-        embeddings = self.embedding_model.encode_texts([split.combined_splits for split in splits])
+        embeddings: list[EmbeddingUnit] = self.embedding_model.encode_texts(
+            texts=[split.combined_splits for split in splits if split.combined_splits],
+            include_metadata=False
+        ) # type: ignore
 
-        distances = self._calculate_cosine_similarities(embeddings)
+        distances = self._calculate_cosine_similarities(embeddings) # type: ignore
 
         breakpoint_distance_threshold = self._calculate_breakpoint_threshold(distances)
 
         # Find indices where the distance is above the threshold
         indices_above_thresh = [i for i, x in enumerate(distances) if x > breakpoint_distance_threshold]
 
-        chunks = []
+        chunks: list[str] = []
 
         if not indices_above_thresh:
             combined_text = ' '.join([d.content for d in splits])

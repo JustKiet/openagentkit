@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from openagentkit.core.models.responses.embedding_response import EmbeddingResponse, EmbeddingUnit
-from typing import Union, Literal
+from typing import Union, TypeVar, Generic
 
-class BaseEmbeddingModel(ABC):
+T = TypeVar("T", int, str)
+
+class BaseEmbeddingModel(ABC, Generic[T]):
     """
     An abstract base class for embedding models.
 
@@ -12,7 +14,7 @@ class BaseEmbeddingModel(ABC):
         `tokenize_texts()`: An abstract method to tokenize texts.
     """
     @abstractmethod
-    def encode_query(self, query: str, include_metadata: bool = False) -> Union[list[EmbeddingUnit], EmbeddingResponse]:
+    def encode_query(self, query: str, include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
         """
         An abstract method to encode a query into an embedding.
 
@@ -44,7 +46,7 @@ class BaseEmbeddingModel(ABC):
         raise NotImplementedError("encode_texts method must be implemented")
     
     @abstractmethod
-    def tokenize_texts(self, texts: list[str]) -> list[list[int | str]]:
+    def tokenize_texts(self, texts: list[str]) -> list[list[T]]:
         """
         An abstract method to tokenize texts.
 

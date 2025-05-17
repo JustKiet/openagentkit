@@ -54,7 +54,7 @@ class CharacterTextChunker(BaseChunker):
         Returns:
             list: A list of chunks.
         """
-        chunks = []
+        chunks: list[str] = []
         start = 0
         while start < len(text):
             end = min(start + self.chunk_size, len(text))

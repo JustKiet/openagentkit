@@ -7,22 +7,22 @@ import tempfile
 import os
 
 from openagentkit.core.utils.audio_utils import AudioUtility
+from openagentkit.modules.openai import OpenAIAudioVoices
 
 class OpenAISpeechService(BaseSpeechModel):
     def __init__(self,
                  client: OpenAI,
-                 voice: Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]] = "nova",
-                 stt_model: Optional[str] = "whisper-1",
-                 *args,
-                 **kwargs,):
+                 voice: OpenAIAudioVoices = "nova",
+                 stt_model: Literal["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"] = "whisper-1",
+                 ) -> None:
         self._client = client
         self.voice = voice
         self.stt_model = stt_model
     
-    def _transcribe_audio(self, file_obj, file_name=None):
+    def _transcribe_audio(self, file_obj: bytes, file_name: Optional[str] = None):
         """Helper method to call OpenAI transcription API with consistent parameters"""
         if file_name and isinstance(file_obj, bytes):
-            file_obj = NamedBytesIO(file_obj, name=file_name)
+            file_obj = NamedBytesIO(file_obj, name=file_name) # type: ignore
             
         response = self._client.audio.transcriptions.create(
             model=self.stt_model,
@@ -66,7 +66,7 @@ class OpenAISpeechService(BaseSpeechModel):
                     
                     # Try direct transcription
                     with open(temp_path, 'rb') as f:
-                        transcription = self._transcribe_audio(f)
+                        transcription = self._transcribe_audio(f) # type: ignore
                         
                     return transcription
                     
@@ -96,7 +96,7 @@ class OpenAISpeechService(BaseSpeechModel):
                         temp_path = temp_file.name
                     
                     with open(temp_path, 'rb') as f:
-                        return self._transcribe_audio(f)
+                        return self._transcribe_audio(f) # type: ignore
                 finally:
                     if temp_path:
                         try:
@@ -111,23 +111,24 @@ class OpenAISpeechService(BaseSpeechModel):
             return "Sorry, I couldn't transcribe the audio."
     
     def text_to_speech(self, 
-                       message: str,
-                       response_format: Optional[str] = "wav",
+                       text: str,
+                       response_format: Literal['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm'] = "wav",
                        ) -> bytes:
         """
         Convert text to speech.
 
         Args:
-            message (str): The text to convert to speech.
-            response_format (Optional[str]): The format to use in the response.
+            text (str): The text to convert to speech.
+            response_format (Literal['mp3', 'opus', 'aac', 'flac', 'wav', 'pcm']): The format to use in the response.
 
         Returns:
             bytes: The audio data in bytes.
         """
+
         response = self._client.audio.speech.create(
             model="tts-1",
             voice=self.voice,
-            input=message,
+            input=text,
             response_format=response_format,
         )
         return response.content

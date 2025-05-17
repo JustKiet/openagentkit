@@ -31,7 +31,7 @@ class EmbeddingUnit(BaseModel):
             index: int
             object: str
             content: str
-            embedding: list[float]
+            embedding: list[float] | list[int] | str
         ```
     Where:
         - `index`: The index of the embedding.
@@ -42,5 +42,5 @@ class EmbeddingUnit(BaseModel):
     index: int
     object: str
     content: str
-    embedding: Union[list[float], str]
+    embedding: Union[list[float], list[int], str]
     type: Literal["base64", "float"]

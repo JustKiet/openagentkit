@@ -54,7 +54,7 @@ class RecursiveTextChunker(BaseChunker):
             return [text]
         
         # Split the text at each separator, keeping the separators
-        split_parts = []
+        split_parts: list[str] = []
         last_end = 0
         for match in re.finditer(re.escape(self._separator), text):
             # Get the text before separator and the separator itself
@@ -67,7 +67,7 @@ class RecursiveTextChunker(BaseChunker):
             split_parts.append(text[last_end:])
         
         # Now combine these parts into chunks according to the size constraints
-        result = []
+        result: list[str] = []
         current_chunk = ""
         
         for part in split_parts:

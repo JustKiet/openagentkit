@@ -1,6 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, Union, Any, Literal
-
+from typing import Optional, Any, Literal
 
 class ToolCallResult(BaseModel):
     tool_name: str
@@ -11,10 +10,9 @@ class ToolCallMessage(BaseModel):
     tool_call_id: str
     content: Any
 
-# TODO: NOT IMPLEMENTED YET. SHOULD BE USED IN THE FUTURE.
 class ToolCallFunction(BaseModel):
     name: str
-    arguments: Union[str, dict]
+    arguments: str
 
 class ToolCallResponse(BaseModel):
     id: str
@@ -22,8 +20,8 @@ class ToolCallResponse(BaseModel):
     function: ToolCallFunction
 
 class ToolResponse(BaseModel):
-    tool_args: Optional[list[dict]] = None
-    tool_calls: Optional[list[dict]] = None
+    tool_args: Optional[list[dict[str, Any]]] = None
+    tool_calls: Optional[list[ToolCallResponse]] = None
     tool_results: Optional[list[ToolCallResult]] = None
     tool_messages: Optional[list[ToolCallMessage]] = None
-    tool_notifications: Optional[list[Union[str, None]]] = None
+    tool_notifications: Optional[list[str]] = None

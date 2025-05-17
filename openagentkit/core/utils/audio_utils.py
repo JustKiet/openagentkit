@@ -1,12 +1,17 @@
 import io
 import wave
 from loguru import logger
-from typing import Literal
+from typing import Literal, TypeAlias
 import struct
+
+AudioFormat: TypeAlias = Literal[
+    "wav", "webm", "mp3", "ogg", "flac", "aac", "aiff",
+    "mpeg", "mpga", "m4a", "pcm", "unknown"
+]
 
 class AudioUtility:
     @staticmethod
-    def detect_audio_format(audio_bytes: bytes) -> Literal["wav", "webm", "mp3", "ogg", "flac", "aac", "aiff", "mpeg", "mpga", "m4a", "pcm", "unknown"]:
+    def detect_audio_format(audio_bytes: bytes) -> AudioFormat:
         """
         Detect the format of audio data based on file signatures.
         
@@ -33,7 +38,7 @@ class AudioUtility:
             for sig, start, end in signatures:
                 if start + len(sig) <= len(audio_bytes) and audio_bytes[start:end].startswith(sig):
                     if fmt == "wav" and not any(s[0] == b'WAVE' for s in signatures) or fmt != "wav":
-                        return fmt
+                        return 'wav'
         
         # Additional checks for formats that need special handling
         # WebM - check for additional signatures if primary one didn't match
@@ -88,10 +93,10 @@ class AudioUtility:
             return False
     
     @staticmethod
-    def raw_bytes_to_wav(raw_audio_bytes, 
-                         sample_rate=16000,  # Whisper prefers 16kHz
-                         num_channels=1,     # Mono is better for speech recognition
-                         sample_width=2) -> io.BytesIO:  # 16-bit audio
+    def raw_bytes_to_wav(raw_audio_bytes: bytes, 
+                         sample_rate: int = 16000,  # Whisper prefers 16kHz
+                         num_channels: int = 1,     # Mono is better for speech recognition
+                         sample_width: int = 2) -> io.BytesIO:  # 16-bit audio
         """
         Convert raw PCM audio bytes into a WAV file-like object.
         
@@ -140,7 +145,7 @@ class AudioUtility:
             return empty_wav
             
     @staticmethod
-    def convert_audio_format(audio_bytes: bytes, source_format: str, target_format: str = "wav") -> bytes:
+    def convert_audio_format(audio_bytes: bytes, source_format: str, target_format: str = "wav") -> bytes | None:
         """
         Convert audio from one format to another using FFmpeg.
         

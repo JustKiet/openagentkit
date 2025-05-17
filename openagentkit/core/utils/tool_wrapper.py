@@ -1,10 +1,46 @@
-from functools import wraps
-from typing import Annotated, Literal, Callable
+from functools import update_wrapper
+from typing import Callable, Literal, Any, Optional, Dict, TypeVar, overload, Union
 from pydantic import create_model
 import inspect
 
+# --------------------------------
+# ToolWrapper implementation
+# --------------------------------
+class ToolWrapper:
+    """
+    Wrapper that makes a function into a tool with a schema.
+    """
+    __tool_wrapped__ = True
+
+    def __init__(
+        self,
+        func: Callable[..., Any],
+        *,
+        schema: Dict[str, Any],
+    ):
+        self._func = func
+        self.schema = schema
+        update_wrapper(self, func)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        return self._func(*args, **kwargs)
+
+    def __repr__(self) -> str:
+        return f"<ToolWrapper {self._func.__name__}>"
+    
+    def __name__(self) -> str:
+        return self._func.__name__
+
+# --------------------------------
+# tool decorator with overloads for proper typing
+# --------------------------------
+T = TypeVar("T", bound=Callable[..., Any])
+
+@overload
+def tool(func: T) -> ToolWrapper: ... # type: ignore
+
+@overload
 def tool(
-    _func: Callable = None,
     *,
     description: str = "",
     schema_type: Literal["OpenAI", "OpenAIRealtime"] = "OpenAI",
@@ -13,61 +49,69 @@ def tool(
         "The notification that you say to the user when you are executing this tool. "
         "If you execute multiple tools, you must include all the tool names in this notification too and all the notifications must be the same."
     )
-):
-    def decorator(func):
-        func.__tool_wrapped__ = True
+) -> Callable[[T], ToolWrapper]: ... # type: ignore
 
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            return func(*args, **kwargs)
-
-        signature = inspect.signature(func)
-        final_description = inspect.getdoc(func) or description
+def tool(
+    func: Optional[T] = None,
+    *,
+    description: str = "",
+    schema_type: Literal["OpenAI", "OpenAIRealtime"] = "OpenAI",
+    add_tool_notification: bool = False,
+    notification_message_guide: str = (
+        "The notification that you say to the user when you are executing this tool. "
+        "If you execute multiple tools, you must include all the tool names in this notification too and all the notifications must be the same."
+    )
+) -> Union[ToolWrapper, Callable[[T], ToolWrapper]]:
+    """
+    Decorator to wrap a function into a ToolWrapper with OpenAI function-calling schema.
+    """
+    def decorator(inner_func: T) -> ToolWrapper:
+        # Inspect signature and build pydantic model for parameters
+        signature = inspect.signature(inner_func)
+        final_description = inspect.getdoc(inner_func) or description
 
         model_fields = {
             name: (param.annotation, ...)
             for name, param in signature.parameters.items()
         }
-
-        ToolArguments = create_model("ToolArguments", **model_fields)
-        tool_arguments = ToolArguments.model_json_schema()
-        tool_arguments.pop("title")
+        ToolArguments = create_model("ToolArguments", **model_fields)  # type: ignore
+        raw_schema = ToolArguments.model_json_schema() # type: ignore
+        assert isinstance(raw_schema, dict), "ToolArguments.model_json_schema() must return a dict"
+        tool_arguments: Dict[str, Any] = raw_schema # type: ignore
+        tool_arguments.pop("title", None)
         tool_arguments["additionalProperties"] = False
 
-        if add_tool_notification is True:
-            tool_arguments.get("properties", {})["_notification"] = {
+        if add_tool_notification:
+            props = tool_arguments.setdefault("properties", {})
+            props["_notification"] = {
                 "title": "Tool Request Notification",
                 "type": "string",
                 "description": notification_message_guide,
             }
-            if tool_arguments.get("required") is None:
-                tool_arguments["required"] = []
+            req = tool_arguments.setdefault("required", [])
+            req.append("_notification")
 
-            tool_arguments.get("required", []).append("_notification")
-
-        match schema_type:
-            case "OpenAI":
-                wrapper.schema = {
-                    "type": "function",
-                    "function": {
-                        "name": func.__name__,
-                        "description": final_description,
-                        "strict": bool(tool_arguments),
-                        "parameters": tool_arguments,
-                    },
-                }
-
-            case "OpenAIRealtime":
-                wrapper.schema = {
-                    "type": "function",
-                    "name": func.__name__,
+        if schema_type == "OpenAI":
+            schema: Dict[str, Any] = {
+                "type": "function",
+                "function": {
+                    "name": inner_func.__name__,
                     "description": final_description,
+                    "strict": True,
                     "parameters": tool_arguments,
-                }
+                },
+            }
+        elif schema_type == "OpenAIRealtime":
+            schema = {
+                "type": "function",
+                "name": inner_func.__name__,
+                "description": final_description,
+                "parameters": tool_arguments,
+            }
+        else:
+            raise ValueError(f"Unsupported schema_type: {schema_type}")
 
-        return wrapper
-    
-    if _func is None:
-        return decorator
-    else:
-        return decorator(_func)
+        return ToolWrapper(inner_func, schema=schema)
+
+    # If used without args: @tool
+    return decorator if func is None else decorator(func)

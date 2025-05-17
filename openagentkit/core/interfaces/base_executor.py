@@ -19,10 +19,10 @@ class BaseExecutor(ABC):
     """
     def __init__(self,
                  system_message: Optional[str] = None, 
-                 context_history: Optional[List[Dict[str, str]]] = None):
+                 context_history: Optional[List[Dict[str, Any]]] = None):
         self._system_message = system_message or "You are a helpful assistant. Try to assist the user as best as you can. If you are unsure, ask clarifying questions. If you don't know the answer, say 'I don't know'."
 
-        self._context_history = [
+        self._context_history: List[Dict[str,  Any]] = [
             {
                 "role": "system",
                 "content": self._system_message,
@@ -108,7 +108,7 @@ class BaseExecutor(ABC):
         """
         raise NotImplementedError
     
-    def get_context(self) -> List[Dict[str, Any]]:
+    def get_history(self) -> List[Dict[str, Any]]:
         """
         An abstract method to get the history of the conversation.
 
@@ -117,7 +117,7 @@ class BaseExecutor(ABC):
         """
         return self._context_history
     
-    def add_context(self, content: dict[str, str]):
+    def add_context(self, content: dict[str, Any]):
         """
         Add context to the model.
 
@@ -133,7 +133,7 @@ class BaseExecutor(ABC):
         self._context_history.append(content)
         return self._context_history
     
-    def extend_context(self, content: List[dict[str, str]]):
+    def extend_context(self, content: List[dict[str, Any]]):
         """
         Extend the context of the model.
 

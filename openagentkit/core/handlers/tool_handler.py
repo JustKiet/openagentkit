@@ -1,11 +1,12 @@
-from typing import List, Optional, Callable, Any, Union, Literal
+from typing import List, Optional, Any, Union, Literal
 from loguru import logger
-from openai._types import NOT_GIVEN
 import json
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.core.models.tool_responses import ToolResponse, ToolCallResult
+from openagentkit.core.models.responses.tool_response import ToolResponse, ToolCallResult, ToolCallMessage, ToolCallResponse, ToolCallFunction
 from openagentkit.core.interfaces import BaseToolHandler
+from openagentkit.core.utils.tool_wrapper import ToolWrapper
 from mcp import ClientSession
+from mcp.types import CallToolResult
 
 class ToolHandler(BaseToolHandler):
     """
@@ -24,22 +25,21 @@ class ToolHandler(BaseToolHandler):
         `tools_map`: A property to get the tools map.
     """
     def __init__(self,
-                 tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
+                 tools: Optional[List[ToolWrapper]] = None,
                  mcp_sessions: Optional[dict[str, ClientSession]] = None,
                  mcp_tools: Optional[dict[str, list[str]]] = None,
-                 llm_provider: Literal["openai"] = None,
-                 schema_type: Literal["OpenAI", "OpenAIRealtime"] = None,
-                 *args,
-                 **kwargs):
+                 llm_provider: Optional[Literal["openai"]] = None,
+                 schema_type: Optional[Literal["OpenAI", "OpenAIRealtime"]] = None,
+                 ):
         
-        self._tools = NOT_GIVEN
-        self.tools_map = NOT_GIVEN
+        self._tools: Optional[list[dict[str, Any]]] = None
+        self.tools_map: Optional[dict[str, Union[ToolWrapper, dict[str, str]]]] = None
         self.llm_provider = llm_provider
 
         if llm_provider is None:
             raise ValueError("llm_provider must be provided")
 
-        if tools is not NOT_GIVEN:
+        if tools:
             self._tools = []
             for tool in tools:
                 if not hasattr(tool, "schema"):
@@ -67,14 +67,12 @@ class ToolHandler(BaseToolHandler):
     @classmethod
     async def from_mcp(cls, 
                        sessions: list[ClientSession],
-                       additional_tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
-                       llm_provider: Literal["openai"] = None) -> "ToolHandler":
+                       additional_tools: Optional[List[ToolWrapper]] = None,
+                       llm_provider: Optional[Literal["openai"]] = None) -> "ToolHandler":
         """Asynchronous factory method to create an instance with tools loaded."""
-        mcp_sessions = {}
-        mcp_tools = {}
+        mcp_sessions: Optional[dict[str, ClientSession]] = {}
+        mcp_tools: Optional[dict[str, list[str]]] = {}
         for session in sessions:
-            if not isinstance(session, ClientSession):
-                raise ValueError("All sessions must be of type ClientSession")
             initialization = await session.initialize()
 
             mcp_sessions[initialization.serverInfo.name] = session
@@ -90,7 +88,7 @@ class ToolHandler(BaseToolHandler):
 
         return self
     
-    def _handle_mcp_tool_schema(self, tool: dict) -> dict:
+    def _handle_mcp_tool_schema(self, tool: dict[str, Any]) -> dict[str, Any]:
         match self.llm_provider:
             case "openai":
                 tool["parameters"] = tool.pop("inputSchema")
@@ -103,14 +101,14 @@ class ToolHandler(BaseToolHandler):
 
         tool_schemas = [tool.model_dump() for tool in tool_list.tools]
         
-        parsed_tools = []
+        parsed_tools: list[dict[str, Any]] = []
 
         for tool in tool_schemas:
             # Check if the tool is already in the tools list
             tool = self._handle_mcp_tool_schema(tool)
             parsed_tools.append(tool)
         
-        mcp_tools = [
+        mcp_tools: list[dict[str, Any]] = [
             {
                 "type": "function",
                 "function": tool
@@ -118,9 +116,9 @@ class ToolHandler(BaseToolHandler):
             for tool in parsed_tools
         ]
 
-        if self._tools is NOT_GIVEN:
+        if self._tools is None:
             self._tools = []
-        if self.tools_map is NOT_GIVEN:
+        if self.tools_map is None:
             self.tools_map = {}
         # Extend the existing tools with the loaded MCP tools
         self._tools.extend(mcp_tools)
@@ -135,14 +133,13 @@ class ToolHandler(BaseToolHandler):
         return self._tools
     
     @tools.setter
-    def tools(self, tools):
-        self._tools = [tool.schema for tool in tools] if tools else NOT_GIVEN
-        self.tools_map = {
+    def tools(self, tools: List[ToolWrapper]):
+        self._tools = [tool.schema for tool in tools]
+        self.tools_map: Optional[dict[str, Union[ToolWrapper, dict[str, str]]]] = {
             tool.schema["function"]["name"]: tool for tool in tools
-        } if tools is not NOT_GIVEN else NOT_GIVEN
-        return f"Binded {len(self._tools)} tools."
+        }
     
-    async def _async_handle_tool_call(self, tool_name: str, **kwargs) -> Any:
+    async def _async_handle_tool_call(self, tool_name: str, **kwargs: Any) -> Any:
         """
         Handle the tool call asynchronously and return the tool result. This method supports MCP tool calling.
 
@@ -153,17 +150,26 @@ class ToolHandler(BaseToolHandler):
         Returns:
             Any: The result of the tool call.
         """
-        if self.tools_map is not NOT_GIVEN:
-            tool = self.tools_map.get(tool_name, None)
+        if self.tools_map is not None:
+            tool: Optional[Union[ToolWrapper, dict[str, str]]] = self.tools_map.get(tool_name, None)
             if not tool:
                 return None
             elif callable(tool):
                 return tool(**kwargs)
-            elif isinstance(tool, dict):
+            else:
                 tool_arguments = kwargs
+
+                if self.mcp_tools_map is None:
+                    logger.error("No MCP tools provided")
+                    return None
+                
                 for session_name, tools in self.mcp_tools_map.items():
-                    if tool_name in tools:
-                        tool_results = await self.sessions_map[session_name].call_tool(
+                    if self.sessions_map is None:
+                        logger.error("No MCP sessions provided")
+                        return None
+                    
+                    if tool_name in tools and self.sessions_map.get(session_name, None) is not None:
+                        tool_results: CallToolResult = await self.sessions_map[session_name].call_tool(
                             name=tool_name, arguments=tool_arguments,
                         )
                         return str([tool_result.model_dump() for tool_result in tool_results.content])
@@ -171,7 +177,7 @@ class ToolHandler(BaseToolHandler):
             logger.error("No tools provided")
             return None
         
-    def _handle_tool_call(self, tool_name: str, **kwargs) -> Any:
+    def _handle_tool_call(self, tool_name: str, **kwargs: Any) -> Any:
         """
         Handle the tool call and return the tool result.
 
@@ -182,7 +188,7 @@ class ToolHandler(BaseToolHandler):
         Returns:
             Any: The result of the tool call.
         """
-        if self.tools_map is not NOT_GIVEN:
+        if self.tools_map is not None:
             tool = self.tools_map.get(tool_name, None)
             if not tool:
                 return None
@@ -192,7 +198,7 @@ class ToolHandler(BaseToolHandler):
             logger.error("No tools provided")
             return None
     
-    def parse_tool_args(self, response: dict) -> list[dict[str, Any]]:
+    def parse_tool_args(self, response: OpenAgentResponse | OpenAgentStreamingResponse) -> list[ToolCallResponse]:
         """
         Parse the tool calls from the response.
 
@@ -202,17 +208,17 @@ class ToolHandler(BaseToolHandler):
         Returns:
             list[dict[str, Any]]: The tool calls.
         """
-        tool_calls = None
-        if hasattr(response, "tool_calls") and response.tool_calls is not None:
+        tool_calls: list[ToolCallResponse] = []
+        if response.tool_calls is not None:
             tool_calls = [
-                {
-                    "id": tc.id,
-                    "type": tc.type,
-                    "function": {
-                        "arguments": tc.function.arguments,
-                        "name": tc.function.name,
-                    },
-                }
+                ToolCallResponse(
+                    id=tc.id,
+                    type=tc.type,
+                    function=ToolCallFunction(
+                        name=tc.function.name,
+                        arguments=tc.function.arguments,
+                    ),
+                )
                 for tc in response.tool_calls
             ]
 
@@ -228,25 +234,25 @@ class ToolHandler(BaseToolHandler):
         Returns:
             Union[OpenAgentStreamingResponse, None]: The notification.
         """
-        notification = chunk.tool_calls[0].get("function")
-        tool_notification = None
+        if chunk.tool_calls is None or len(chunk.tool_calls) == 0:
+            #logger.debug("No tool calls found in the chunk. Skipping tool call handling.")
+            return None
         
-        if notification.get("arguments"):
-            if type(notification.get("arguments")) == str:
-                args = json.loads(notification.get("arguments"))
-            else:
-                args = notification.get("arguments")
+        notification = chunk.tool_calls[0].function
+        tool_notification = None
 
-            if args.get("_notification"):
-                tool_notification = args.get("_notification", None)
+        args = json.loads(notification.arguments)
 
-            if notification:
-                #logger.info(f"Tool Notification: {tool_notification}")
-                return OpenAgentStreamingResponse(
-                    role="assistant",
-                    content=None,
-                    tool_notification=tool_notification,
-                )
+        if args.get("_notification"):
+            tool_notification = args.get("_notification", None)
+
+        if tool_notification:
+            #logger.info(f"Tool Notification: {tool_notification}")
+            return OpenAgentStreamingResponse(
+                role="assistant",
+                content=None,
+                tool_notification=tool_notification,
+            )
             
         return None
 
@@ -263,10 +269,10 @@ class ToolHandler(BaseToolHandler):
         if type(response) != OpenAgentResponse and type(response) != OpenAgentStreamingResponse:
             raise AttributeError("Response must be an OpenAgentResponse or OpenAgentStreamingResponse object")
         
-        tool_args_list = []
-        tool_results_list = []
-        tool_messages_list = []
-        notifications_list = []
+        tool_args_list: list[dict[str, Any]] = []
+        tool_results_list: list[ToolCallResult] = []
+        tool_messages_list: list[ToolCallMessage] = []
+        notifications_list: list[str] = []
         
         # Check if the response contains tool calls
         if response.tool_calls is None:
@@ -281,13 +287,15 @@ class ToolHandler(BaseToolHandler):
 
         # Handle tool calls 
         for tool_call in response.tool_calls:
-            tool_call_id = tool_call.get("id")
-            tool_name = tool_call.get("function").get("name")
-            tool_args: dict = eval(tool_call.get("function").get("arguments"))
+            tool_call_id = tool_call.id
+            tool_name = tool_call.function.name
+            tool_args: dict[str, Any] = json.loads(tool_call.function.arguments)
             # Save notification value and remove _notification key from tool args if present
-            notification = tool_args.get("_notification", None)
-            notifications_list.append(notification)
-            tool_args.pop("_notification", None)
+            notification: Optional[str] = tool_args.get("_notification", None)
+
+            if notification:
+                notifications_list.append(notification)
+                tool_args.pop("_notification", None)
             
             # Handle the tool call (execute the tool)
             tool_result = await self._async_handle_tool_call(tool_name, **tool_args)
@@ -307,14 +315,14 @@ class ToolHandler(BaseToolHandler):
             
             # Convert tool result to string if it's not already a string
             tool_result_str = str(tool_result)
-            
-            tool_message = {
-                "role": "tool",
-                "tool_call_id": tool_call_id,
-                "content": tool_result_str,  # Use string representation
-            }
 
-            tool_messages_list.append(tool_message)  
+            tool_messages_list.append(
+                ToolCallMessage(
+                    role="tool",
+                    tool_call_id=tool_call_id,
+                    content=tool_result_str
+                )
+            )
         
         return ToolResponse(
             tool_args=tool_args_list,
@@ -337,10 +345,10 @@ class ToolHandler(BaseToolHandler):
         if type(response) != OpenAgentResponse and type(response) != OpenAgentStreamingResponse:
             raise AttributeError("Response must be an OpenAgentResponse or OpenAgentStreamingResponse object")
         
-        tool_args_list = []
-        tool_results_list = []
-        tool_messages_list = []
-        notifications_list = []
+        tool_args_list: list[dict[str, Any]] = []
+        tool_results_list: list[ToolCallResult] = []
+        tool_messages_list: list[ToolCallMessage] = []
+        notifications_list: list[str] = []
         
         # Check if the response contains tool calls
         if response.tool_calls is None:
@@ -355,13 +363,15 @@ class ToolHandler(BaseToolHandler):
 
         # Handle tool calls 
         for tool_call in response.tool_calls:
-            tool_call_id = tool_call.get("id")
-            tool_name = tool_call.get("function").get("name")
-            tool_args: dict = eval(tool_call.get("function").get("arguments"))
+            tool_call_id = tool_call.id
+            tool_name = tool_call.function.name
+            tool_args: dict[str, Any] = json.loads(tool_call.function.arguments)
             # Save notification value and remove _notification key from tool args if present
-            notification = tool_args.get("_notification", None)
-            notifications_list.append(notification)
-            tool_args.pop("_notification", None)
+            notification: Optional[str] = tool_args.get("_notification", None)
+
+            if notification:
+                notifications_list.append(notification)
+                tool_args.pop("_notification", None)
             
             # Handle the tool call (execute the tool)
             tool_result = self._handle_tool_call(tool_name, **tool_args)
@@ -381,14 +391,14 @@ class ToolHandler(BaseToolHandler):
             
             # Convert tool result to string if it's not already a string
             tool_result_str = str(tool_result)
-            
-            tool_message = {
-                "role": "tool",
-                "tool_call_id": tool_call_id,
-                "content": tool_result_str,  # Use string representation
-            }
 
-            tool_messages_list.append(tool_message)  
+            tool_messages_list.append(
+                ToolCallMessage(
+                    role="tool",
+                    tool_call_id=tool_call_id,
+                    content=tool_result_str
+                )
+            )
         
         return ToolResponse(
             tool_args=tool_args_list,

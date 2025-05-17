@@ -1,8 +1,10 @@
 from abc import ABC, abstractmethod
 from openagentkit.core.models.responses.embedding_response import EmbeddingResponse, EmbeddingUnit
-from typing import Union, Literal
+from typing import Union, TypeVar, Generic
 
-class AsyncBaseEmbeddingModel(ABC):
+T = TypeVar("T", int, str)
+
+class AsyncBaseEmbeddingModel(ABC, Generic[T]):
     """
     An abstract base class for async embedding models.
 
@@ -12,7 +14,7 @@ class AsyncBaseEmbeddingModel(ABC):
         `tokenize_texts()`: An abstract method to tokenize texts.
     """
     @abstractmethod
-    async def encode_query(self, query: str, include_metadata: bool = False) -> Union[list[EmbeddingUnit], EmbeddingResponse]:
+    async def encode_query(self, query: str, include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
         """
         An abstract method to encode a query into an embedding.
 
@@ -21,9 +23,9 @@ class AsyncBaseEmbeddingModel(ABC):
             include_metadata (bool): Whether to include metadata in the response.
 
         Returns:
-            Union[list[EmbeddingUnit], EmbeddingResponse]: The embeddings response. 
-            If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the embedding. 
-            If `include_metadata` is `False`, return a list of `EmbeddingUnit` objects containing the embedding.
+            Union[EmbeddingUnit, EmbeddingResponse]: The embeddings response. 
+            If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the query embedding response. 
+            If `include_metadata` is `False`, return an `EmbeddingUnit` object containing the query embedding.
         """
         raise NotImplementedError("encode_query method must be implemented")
 
@@ -44,7 +46,7 @@ class AsyncBaseEmbeddingModel(ABC):
         raise NotImplementedError("encode_texts method must be implemented")
     
     @abstractmethod
-    def tokenize_texts(self, texts: list[str]) -> list[list[int]]:
+    def tokenize_texts(self, texts: list[str]) -> list[list[T]]:
         """
         An abstract method to tokenize texts.
 

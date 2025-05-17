@@ -1,17 +1,17 @@
 from openagentkit.core.interfaces import AsyncBaseEmbeddingModel
 from openagentkit.core.models.io.embeddings import EmbeddingUnit
 from openagentkit.core.models.responses import EmbeddingResponse
-from typing import Literal, Union, Optional
-from voyageai import AsyncClient
+from typing import Literal, Union, Optional, overload
+from voyageai.client_async import AsyncClient
 import base64
 import os
 import warnings
 import struct
 
-class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
+class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel[str]):
     def __init__(self,
-                 client: AsyncClient = None,
-                 api_key: str = os.getenv("VOYAGE_API_KEY"),
+                 client: Optional[AsyncClient] = None,
+                 api_key: Optional[str] = os.getenv("VOYAGE_API_KEY"),
                  embedding_model: Literal[
                      "voyage-3-large",
                      "voyage-3",
@@ -23,14 +23,16 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
                  ] = "voyage-3-large",
                  dimensions: Literal[256, 512, 1024, 1536, 2048] = 1024,
                  encoding_format: Literal["float", "base64"] = "float"):
-        self._client = client
-        if self._client is None:
+        
+        if client is None:
             if api_key is None:
                 raise ValueError("No API key provided. Please set the VOYAGE_API_KEY environment variable or pass it as an argument.")
             self._client = AsyncClient(api_key=api_key)
+        else:
+            self._client = client
         
         self._embedding_model = embedding_model
-        self._encoding_format = encoding_format
+        self._encoding_format: Literal["float", "base64"] = encoding_format
         self._dimensions = self._handle_model_dimensions(embedding_model, dimensions)
 
     @property
@@ -43,7 +45,7 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
         return self._encoding_format
     
     @encoding_format.setter
-    def encoding_format(self, value: str) -> None:
+    def encoding_format(self, value: Literal["float", "base64"]) -> None:
         """
         Set the encoding format.
         Args:
@@ -100,7 +102,7 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
         return self._dimensions
     
     @dimensions.setter
-    def dimensions(self, value: int) -> None:
+    def dimensions(self, value: Literal[256, 512, 1024, 1536, 2048]) -> None:
         """
         Set the dimensions of the embedding model.
         Args:
@@ -163,11 +165,27 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
                     return 1536
                 else:
                     return dimensions
+            case _:
+                raise ValueError("Invalid embedding model. Supported models are: 'voyage-3-large', 'voyage-3', 'voyage-3-lite', 'voyage-code-3', 'voyage-finance-2', 'voyage-law-2', 'voyage-code-2'.")
     
+    @overload
+    async def encode_query(self,
+                           query: str,
+                           include_metadata: Literal[True],
+                           truncation: bool = True) -> EmbeddingResponse:
+        ...
+
+    @overload
+    async def encode_query(self,
+                           query: str,
+                           include_metadata: Literal[False],
+                           truncation: bool = True) -> EmbeddingUnit:
+        ...
+
     async def encode_query(self, 
                            query: str, 
-                           truncation: bool = True,
-                           include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
+                           include_metadata: bool = False,
+                           truncation: bool = True,) -> Union[EmbeddingUnit, EmbeddingResponse]:
         """
         Encode a query into an embedding.
 
@@ -195,7 +213,7 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
         
     def _handle_base64_encoding(
         self, 
-        embedding: list[float],
+        embedding: list[float] | list[int],
     ) -> str:
         """
         Handle base64 encoding of the embedding.
@@ -206,14 +224,30 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
         Returns:
             str: The base64 encoded string.
         """
-        embedding = struct.pack(f"{len(embedding)}f", *embedding)
-        return base64.b64encode(embedding).decode("utf-8")
+        embedding = struct.pack(f"{len(embedding)}f", *embedding) # type: ignore
+        return base64.b64encode(embedding).decode("utf-8") # type: ignore
+
+    @overload
+    async def encode_texts(self,
+                           texts: list[str],
+                           include_metadata: Literal[True],
+                           input_type: Optional[Literal["query", "document"]] = "document",
+                           truncation: bool = True) -> EmbeddingResponse:
+        ...
+
+    @overload
+    async def encode_texts(self,
+                           texts: list[str],
+                           include_metadata: Literal[False],
+                           input_type: Optional[Literal["query", "document"]] = "document",
+                           truncation: bool = True) -> list[EmbeddingUnit]:
+        ...
 
     async def encode_texts(self, 
                            texts: list[str], 
+                           include_metadata: bool = False,
                            input_type: Optional[Literal["query", "document"]] = "document",
-                           truncation: bool = True,
-                           include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
+                           truncation: bool = True,) -> Union[list[EmbeddingUnit], EmbeddingResponse]:
         """
         Encode texts into embeddings.
 
@@ -250,7 +284,7 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
                     object="embedding",
                     content=texts[idx],
                     embedding=embedding,
-                    type=self.encoding_format
+                    type=self._encoding_format
                 )
             )
 
@@ -273,6 +307,6 @@ class AsyncVoyageAIEmbeddingModel(AsyncBaseEmbeddingModel):
         """
         tokenized = self._client.tokenize(texts, model=self.embedding_model)
 
-        tokenized_texts = [item for item in tokenized if isinstance(item, list)]
+        tokenized_texts = [item for item in tokenized if isinstance(item, list)] # type: ignore
         
-        return tokenized_texts
+        return tokenized_texts # type: ignore
