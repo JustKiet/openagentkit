@@ -1,0 +1,5 @@
+-r requirements-core.in
+-r requirements-mcp.in
+-r requirements-openai.in
+-r requirements-milvus.in
+-r requirements-voyageai.in

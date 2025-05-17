@@ -138,7 +138,25 @@ class ToolHandler(BaseToolHandler):
         self.tools_map: Optional[dict[str, Union[ToolWrapper, dict[str, str]]]] = {
             tool.schema["function"]["name"]: tool for tool in tools
         }
-    
+
+    async def _handle_mcp_tool_call(self, tool_name: str, **kwargs: Any) -> Any:
+        tool_arguments = kwargs
+
+        if self.mcp_tools_map is None:
+            logger.error("No MCP tools provided")
+            return None
+        
+        for session_name, tools in self.mcp_tools_map.items():
+            if self.sessions_map is None:
+                logger.error("No MCP sessions provided")
+                return None
+            
+            if tool_name in tools and self.sessions_map.get(session_name, None) is not None:
+                tool_results: CallToolResult = await self.sessions_map[session_name].call_tool(
+                    name=tool_name, arguments=tool_arguments,
+                )
+                return str([tool_result.model_dump() for tool_result in tool_results.content])
+            
     async def _async_handle_tool_call(self, tool_name: str, **kwargs: Any) -> Any:
         """
         Handle the tool call asynchronously and return the tool result. This method supports MCP tool calling.
@@ -157,22 +175,8 @@ class ToolHandler(BaseToolHandler):
             elif callable(tool):
                 return tool(**kwargs)
             else:
-                tool_arguments = kwargs
-
-                if self.mcp_tools_map is None:
-                    logger.error("No MCP tools provided")
-                    return None
+                return await self._handle_mcp_tool_call(tool_name, **kwargs)
                 
-                for session_name, tools in self.mcp_tools_map.items():
-                    if self.sessions_map is None:
-                        logger.error("No MCP sessions provided")
-                        return None
-                    
-                    if tool_name in tools and self.sessions_map.get(session_name, None) is not None:
-                        tool_results: CallToolResult = await self.sessions_map[session_name].call_tool(
-                            name=tool_name, arguments=tool_arguments,
-                        )
-                        return str([tool_result.model_dump() for tool_result in tool_results.content])
         else:
             logger.error("No tools provided")
             return None
