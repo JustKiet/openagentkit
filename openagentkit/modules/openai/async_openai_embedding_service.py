@@ -8,12 +8,14 @@ from typing import Union, Optional
 import os
 
 class AsyncOpenAIEmbeddingModel(AsyncBaseEmbeddingModel[int]):
-    def __init__(self, 
-                 client: Optional[AsyncOpenAI] = None,
-                 api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-                 embedding_model: OpenAIEmbeddingModels = "text-embedding-3-small",
-                 embedding_encoding: OpenAIEmbeddingEncodings = "cl100k_base",
-                 encoding_format: OpenAIEncodingFormats = "float"):
+    def __init__(
+        self, 
+        client: Optional[AsyncOpenAI] = None,
+        api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
+        embedding_model: OpenAIEmbeddingModels = "text-embedding-3-small",
+        embedding_encoding: OpenAIEmbeddingEncodings = "cl100k_base",
+        encoding_format: OpenAIEncodingFormats = "float"
+    ) -> None:
         self._client = client
         if self._client is None:
             if api_key is None:

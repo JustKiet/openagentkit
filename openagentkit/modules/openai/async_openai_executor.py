@@ -6,8 +6,8 @@ from openai import AsyncOpenAI
 from openagentkit.core.interfaces.async_base_executor import AsyncBaseExecutor
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.core.handlers import ToolHandler
-from openagentkit.core.utils.tool_wrapper import ToolWrapper
+from openagentkit.core.handlers.tools.tool_handler import ToolHandler
+from openagentkit.core.handlers.tools.tool_wrapper import Tool
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from pydantic import BaseModel
 from mcp import ClientSession
@@ -38,16 +38,18 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
     ```
 
     """
-    def __init__(self,
-                 client: Optional[AsyncOpenAI] = None,
-                 model: str = "gpt-4o-mini",
-                 system_message: Optional[str] = None,
-                 tools: Optional[List[ToolWrapper]] = None,
-                 api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-                 temperature: Optional[float] = None,
-                 max_tokens: Optional[int] = None,
-                 top_p: Optional[float] = None,
-                 **kwargs: Any):
+    def __init__(
+        self,
+        client: Optional[AsyncOpenAI] = None,
+        model: str = "gpt-4o-mini",
+        system_message: Optional[str] = None,
+        tools: Optional[List[Tool]] = None,
+        api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        **kwargs: Any
+    ) -> None:
         context_history = kwargs.get("context_history", None)
         super().__init__(system_message=system_message, context_history=context_history)
         self._llm_service = AsyncOpenAILLMService(
@@ -106,18 +108,19 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             top_p=self.top_p,
         )
 
-    async def execute(self, 
-                      messages: List[Dict[str, str]],
-                      tools: Optional[List[Dict[str, Any]]] = None,
-                      temperature: Optional[float] = None,
-                      max_tokens: Optional[int] = None,
-                      top_p: Optional[float] = None,
-                      response_schema: Optional[type[BaseModel]] = None,
-                      audio: Optional[bool] = False,
-                      audio_format: Optional[OpenAIAudioFormats] = "pcm16",
-                      audio_voice: Optional[OpenAIAudioVoices] = "alloy",
-                      **kwargs: Any,
-                    ) -> AsyncGenerator[OpenAgentResponse, None]:
+    async def execute(
+        self, 
+        messages: List[Dict[str, str]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        response_schema: Optional[type[BaseModel]] = None,
+        audio: Optional[bool] = False,
+        audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+        audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        **kwargs: Any,
+    ) -> AsyncGenerator[OpenAgentResponse, None]:
         """
         Asynchronously execute the OpenAI model and return an OpenAgentResponse object.
 
@@ -259,18 +262,19 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
                     usage=response.usage,
                 )
 
-    async def stream_execute(self, 
-                             messages: List[Dict[str, str]],
-                             tools: Optional[List[Dict[str, Any]]] = None,
-                             temperature: Optional[float] = None,
-                             max_tokens: Optional[int] = None,
-                             top_p: Optional[float] = None,
-                             response_schema: Optional[type[BaseModel]] = None,
-                             audio: Optional[bool] = False,
-                             audio_format: Optional[OpenAIAudioFormats] = "pcm16",
-                             audio_voice: Optional[OpenAIAudioVoices] = "alloy",
-                             **kwargs: Any,
-                             ) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
+    async def stream_execute(
+        self, 
+        messages: List[Dict[str, str]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        response_schema: Optional[type[BaseModel]] = None,
+        audio: Optional[bool] = False,
+        audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+        audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        **kwargs: Any,
+    ) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
         """
         Asynchronously stream the OpenAI model and return an OpenAgentStreamingResponse object.
 

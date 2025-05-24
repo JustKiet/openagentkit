@@ -4,7 +4,7 @@ import json
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.core.models.responses.tool_response import ToolResponse, ToolCallResult, ToolCallMessage, ToolCallResponse, ToolCallFunction
 from openagentkit.core.interfaces import BaseToolHandler
-from openagentkit.core.utils.tool_wrapper import ToolWrapper
+from openagentkit.core.handlers.tools.tool_wrapper import Tool
 from mcp import ClientSession
 from mcp.types import CallToolResult
 
@@ -25,7 +25,7 @@ class ToolHandler(BaseToolHandler):
         `tools_map`: A property to get the tools map.
     """
     def __init__(self,
-                 tools: Optional[List[ToolWrapper]] = None,
+                 tools: Optional[List[Tool]] = None,
                  mcp_sessions: Optional[dict[str, ClientSession]] = None,
                  mcp_tools: Optional[dict[str, list[str]]] = None,
                  llm_provider: Optional[Literal["openai"]] = None,
@@ -33,7 +33,7 @@ class ToolHandler(BaseToolHandler):
                  ):
         
         self._tools: Optional[list[dict[str, Any]]] = None
-        self.tools_map: Optional[dict[str, Union[ToolWrapper, dict[str, str]]]] = None
+        self.tools_map: Optional[dict[str, Union[Tool, dict[str, str]]]] = None
         self.llm_provider = llm_provider
 
         if llm_provider is None:
@@ -67,7 +67,7 @@ class ToolHandler(BaseToolHandler):
     @classmethod
     async def from_mcp(cls, 
                        sessions: list[ClientSession],
-                       additional_tools: Optional[List[ToolWrapper]] = None,
+                       additional_tools: Optional[List[Tool]] = None,
                        llm_provider: Optional[Literal["openai"]] = None) -> "ToolHandler":
         """Asynchronous factory method to create an instance with tools loaded."""
         mcp_sessions: Optional[dict[str, ClientSession]] = {}
@@ -133,9 +133,9 @@ class ToolHandler(BaseToolHandler):
         return self._tools
     
     @tools.setter
-    def tools(self, tools: List[ToolWrapper]):
+    def tools(self, tools: List[Tool]):
         self._tools = [tool.schema for tool in tools]
-        self.tools_map: Optional[dict[str, Union[ToolWrapper, dict[str, str]]]] = {
+        self.tools_map: Optional[dict[str, Union[Tool, dict[str, str]]]] = {
             tool.schema["function"]["name"]: tool for tool in tools
         }
 
@@ -169,7 +169,7 @@ class ToolHandler(BaseToolHandler):
             Any: The result of the tool call.
         """
         if self.tools_map is not None:
-            tool: Optional[Union[ToolWrapper, dict[str, str]]] = self.tools_map.get(tool_name, None)
+            tool: Optional[Union[Tool, dict[str, str]]] = self.tools_map.get(tool_name, None)
             if not tool:
                 return None
             elif callable(tool):

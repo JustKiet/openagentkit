@@ -78,7 +78,7 @@ class AsyncBaseExecutor(ABC):
     @abstractmethod
     async def execute(self,
                       messages: List[Dict[str, str]],
-                      tools: Optional[List[Dict[str, Any]]],
+                      tools: Optional[List[Dict[str, Any]]] = None,
                       temperature: Optional[float] = None,
                       max_tokens: Optional[int] = None,
                       top_p: Optional[float] = None) -> AsyncGenerator[OpenAgentResponse, None]:
@@ -106,7 +106,7 @@ class AsyncBaseExecutor(ABC):
     @abstractmethod
     async def stream_execute(self,
                              messages: List[Dict[str, str]],
-                             tools: Optional[List[Dict[str, Any]]],
+                             tools: Optional[List[Dict[str, Any]]] = None,
                              temperature: Optional[float] = None,
                              max_tokens: Optional[int] = None,
                              top_p: Optional[float] = None) -> AsyncGenerator[OpenAgentStreamingResponse, None]:

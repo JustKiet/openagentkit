@@ -4,9 +4,9 @@ from pydantic import create_model
 import inspect
 
 # --------------------------------
-# ToolWrapper implementation
+# Tool implementation
 # --------------------------------
-class ToolWrapper:
+class Tool:
     """
     Wrapper that makes a function into a tool with a schema.
     """
@@ -26,7 +26,7 @@ class ToolWrapper:
         return self._func(*args, **kwargs)
 
     def __repr__(self) -> str:
-        return f"<ToolWrapper {self._func.__name__}>"
+        return f"<Tool {self._func.__name__}>"
     
     def __name__(self) -> str:
         return self._func.__name__
@@ -37,7 +37,7 @@ class ToolWrapper:
 T = TypeVar("T", bound=Callable[..., Any])
 
 @overload
-def tool(func: T) -> ToolWrapper: ... # type: ignore
+def tool(func: T) -> Tool: ... # type: ignore
 
 @overload
 def tool(
@@ -49,7 +49,7 @@ def tool(
         "The notification that you say to the user when you are executing this tool. "
         "If you execute multiple tools, you must include all the tool names in this notification too and all the notifications must be the same."
     )
-) -> Callable[[T], ToolWrapper]: ... # type: ignore
+) -> Callable[[T], Tool]: ... # type: ignore
 
 def tool(
     func: Optional[T] = None,
@@ -61,11 +61,11 @@ def tool(
         "The notification that you say to the user when you are executing this tool. "
         "If you execute multiple tools, you must include all the tool names in this notification too and all the notifications must be the same."
     )
-) -> Union[ToolWrapper, Callable[[T], ToolWrapper]]:
+) -> Union[Tool, Callable[[T], Tool]]:
     """
-    Decorator to wrap a function into a ToolWrapper with OpenAI function-calling schema.
+    Decorator to wrap a function into a Tool with OpenAI function-calling schema.
     """
-    def decorator(inner_func: T) -> ToolWrapper:
+    def decorator(inner_func: T) -> Tool:
         # Inspect signature and build pydantic model for parameters
         signature = inspect.signature(inner_func)
         final_description = inspect.getdoc(inner_func) or description
@@ -111,7 +111,7 @@ def tool(
         else:
             raise ValueError(f"Unsupported schema_type: {schema_type}")
 
-        return ToolWrapper(inner_func, schema=schema)
+        return Tool(inner_func, schema=schema)
 
     # If used without args: @tool
     return decorator if func is None else decorator(func)

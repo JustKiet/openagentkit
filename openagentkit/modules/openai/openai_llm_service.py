@@ -6,7 +6,7 @@ from openai.types.chat.chat_completion_stream_options_param import ChatCompletio
 from openai.types.chat.chat_completion_audio_param import ChatCompletionAudioParam
 
 from pydantic import BaseModel
-from openagentkit.core.handlers.tool_handler import ToolHandler
+from openagentkit.core.handlers.tools.tool_handler import ToolHandler
 from openagentkit.core.interfaces import BaseLLMModel
 from openagentkit.core.models.responses import (
     OpenAgentStreamingResponse, 
@@ -15,7 +15,7 @@ from openagentkit.core.models.responses import (
     PromptTokensDetails, 
     CompletionTokensDetails, 
 )
-from openagentkit.core.utils.tool_wrapper import ToolWrapper
+from openagentkit.core.handlers.tools.tool_wrapper import Tool
 from openagentkit.core.models.responses.tool_response import *
 from openagentkit.core.models.responses.audio_response import AudioResponse
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
@@ -24,15 +24,16 @@ import os
 from loguru import logger
 
 class OpenAILLMService(BaseLLMModel):
-    def __init__(self, 
-                 client: Optional[OpenAI] = None,
-                 model: str = "gpt-4o-mini",
-                 tools: Optional[List[ToolWrapper]] = None,
-                 api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-                 temperature: Optional[float] = 0.3,
-                 max_tokens: Optional[int] = None,
-                 top_p: Optional[float] = None,
-                 ) -> None:
+    def __init__(
+        self, 
+        client: Optional[OpenAI] = None,
+        model: str = "gpt-4o-mini",
+        tools: Optional[List[Tool]] = None,
+        api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
+        temperature: Optional[float] = 0.3,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+    ) -> None:
         super().__init__(
             temperature=temperature,
             max_tokens=max_tokens,
@@ -134,17 +135,19 @@ class OpenAILLMService(BaseLLMModel):
             top_p=self._top_p,
         )
     
-    def _handle_client_request(self,
-                               messages: List[Dict[str, str]],
-                               tools: Optional[Union[List[Dict[str, Any]], NotGiven]] = None,
-                               response_schema: Union[type[BaseModel], NotGiven] = NOT_GIVEN,
-                               temperature: Optional[float] = None,
-                               max_tokens: Optional[int] = None,
-                               top_p: Optional[float] = None,
-                               audio: Optional[bool] = False,
-                               audio_format: Optional[OpenAIAudioFormats] = "pcm16",
-                               audio_voice: Optional[OpenAIAudioVoices] = None,
-                               **kwargs: Any) -> OpenAgentResponse:
+    def _handle_client_request(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Optional[Union[List[Dict[str, Any]], NotGiven]] = None,
+        response_schema: Union[type[BaseModel], NotGiven] = NOT_GIVEN,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        audio: Optional[bool] = False,
+        audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+        audio_voice: Optional[OpenAIAudioVoices] = None,
+        **kwargs: Any
+    ) -> OpenAgentResponse:
         """
         Handle the client request.
 
@@ -178,17 +181,17 @@ class OpenAILLMService(BaseLLMModel):
         if response_schema is NOT_GIVEN or isinstance(response_schema, NotGiven):
             # Handle the client request without response schema
             client_response = self._client.chat.completions.create(
-                    model=self._model,
-                    messages=messages, # type: ignore
-                    tools=tools, # type: ignore
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    top_p=top_p,
-                    modalities=["text", "audio"] if audio else ["text"],
-                    audio=ChatCompletionAudioParam(
-                        format=audio_format,
-                        voice=audio_voice,
-                    ) if audio and audio_format and audio_voice else None,
+                model=self._model,
+                messages=messages, # type: ignore
+                tools=tools, # type: ignore
+                temperature=temperature,
+                max_tokens=max_tokens,
+                top_p=top_p,
+                modalities=["text", "audio"] if audio else ["text"],
+                audio=ChatCompletionAudioParam(
+                    format=audio_format,
+                    voice=audio_voice,
+                ) if audio and audio_format and audio_voice else None,
             )
             
             response_message = client_response.choices[0].message
@@ -272,17 +275,19 @@ class OpenAILLMService(BaseLLMModel):
         
         return response
     
-    def _handle_client_stream(self,
-                              messages: List[Dict[str, str]],
-                              tools: Optional[List[Dict[str, Any]]] = None,
-                              response_schema: Optional[type[BaseModel]] = None,
-                              temperature: Optional[float] = None,
-                              max_tokens: Optional[int] = None,
-                              top_p: Optional[float] = None,
-                              audio: Optional[bool] = False,
-                              audio_format: Optional[OpenAIAudioFormats] = "pcm16",
-                              audio_voice: Optional[OpenAIAudioVoices] = None,
-                              **kwargs: Any) -> Generator[OpenAgentStreamingResponse, None, None]:
+    def _handle_client_stream(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        response_schema: Optional[type[BaseModel]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        audio: Optional[bool] = False,
+        audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+        audio_voice: Optional[OpenAIAudioVoices] = None,
+        **kwargs: Any
+    ) -> Generator[OpenAgentStreamingResponse, None, None]:
         """
         Handle the client stream.
 
@@ -456,17 +461,19 @@ class OpenAILLMService(BaseLLMModel):
                             print("Error in stream:", event.error)
                             break
         
-    def model_generate(self, 
-                       messages: List[Dict[str, str]],
-                       response_schema: Optional[type[BaseModel]] = None,
-                       temperature: Optional[float] = None,
-                       max_tokens: Optional[int] = None,
-                       top_p: Optional[float] = None,
-                       tools: Optional[List[Dict[str, Any]]] = None,
-                       audio: Optional[bool] = False,
-                       audio_format: Optional[OpenAIAudioFormats] = "pcm16",
-                       audio_voice: Optional[OpenAIAudioVoices] = None,
-                       **kwargs: Any) -> OpenAgentResponse:
+    def model_generate(
+        self, 
+        messages: List[Dict[str, str]],
+        response_schema: Optional[type[BaseModel]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        audio: Optional[bool] = False,
+        audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+        audio_voice: Optional[OpenAIAudioVoices] = None,
+        **kwargs: Any
+    ) -> OpenAgentResponse:
         """
         Generate a response from the model.
         
@@ -532,17 +539,19 @@ class OpenAILLMService(BaseLLMModel):
         
         return response
 
-    def model_stream(self,
-                     messages: List[Dict[str, str]],
-                     response_schema: Optional[type[BaseModel]] = None,
-                     temperature: Optional[float] = None,
-                     max_tokens: Optional[int] = None,
-                     top_p: Optional[float] = None,
-                     tools: Optional[List[Dict[str, Any]]] = None,
-                     audio: Optional[bool] = False,
-                     audio_format: Optional[OpenAIAudioFormats] = "pcm16",
-                     audio_voice: Optional[OpenAIAudioVoices] = "alloy",
-                     **kwargs: Any) -> Generator[OpenAgentStreamingResponse, None, None]:
+    def model_stream(
+        self,
+        messages: List[Dict[str, str]],
+        response_schema: Optional[type[BaseModel]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        audio: Optional[bool] = False,
+        audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+        audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        **kwargs: Any
+    ) -> Generator[OpenAgentStreamingResponse, None, None]:
         """
         Generate a response from the model.
 

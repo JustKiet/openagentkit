@@ -5,11 +5,11 @@ from openai.types.beta.realtime import *
 from openagentkit.core.models.responses import OpenAgentStreamingResponse
 from openagentkit.core.models.responses import UsageResponse, PromptTokensDetails, CompletionTokensDetails
 from openagentkit.core.interfaces import AsyncBaseLLMModel
-from openagentkit.core.utils.tool_wrapper import ToolWrapper
+from openagentkit.core.handlers.tools.tool_wrapper import Tool
 from openagentkit.modules.openai import OpenAIAudioVoices
 import os
 from openai._types import NOT_GIVEN
-from openagentkit.core.handlers.tool_handler import ToolHandler
+from openagentkit.core.handlers.tools.tool_handler import ToolHandler
 from loguru import logger
 import asyncio
 
@@ -19,7 +19,7 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                  model: str = "gpt-4o-mini-realtime-preview",
                  voice: OpenAIAudioVoices = "alloy",
                  system_message: Optional[str] = None,
-                 tools: Optional[List[ToolWrapper]] = None,
+                 tools: Optional[List[Tool]] = None,
                  timeout: float = 60.0,
                  api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
                  temperature: Optional[float] = 0.8,
@@ -298,7 +298,6 @@ class OpenAIRealtimeService(AsyncBaseLLMModel):
                     "instructions": self._system_message,
                     "input_audio_transcription": {
                         "model": "gpt-4o-transcribe",
-                        "prompt": "The following speech is a user query to a Mall Kiosk AI assistant at The Mall Group. It could mention a specific mall ('Bangkae', 'Bangkapi', 'Thapra', 'Korat', 'EmQuartier', 'Emdistrict', 'Emsphere', 'MLifeStore', 'BluePort', 'Bangkok Mall'), a promotion, or a credit card. ('SCB', 'KTC', 'Krungsri', 'KBank', 'Krungthai Bank', 'Bangkok Bank', 'CardX', 'MCard').",
                     },
                     "voice": self._voice,
                     "model": self._model,

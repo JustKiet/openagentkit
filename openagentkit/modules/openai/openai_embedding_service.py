@@ -8,12 +8,14 @@ from typing import Literal, Union, Optional, overload
 import os
 
 class OpenAIEmbeddingModel(BaseEmbeddingModel[int]):
-    def __init__(self, 
-                 client: Optional[OpenAI] = None,
-                 api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-                 embedding_model: OpenAIEmbeddingModels = "text-embedding-3-small",
-                 embedding_encoding: OpenAIEmbeddingEncodings = "cl100k_base",
-                 encoding_format: OpenAIEncodingFormats = "float"):
+    def __init__(
+        self, 
+        client: Optional[OpenAI] = None,
+        api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
+        embedding_model: OpenAIEmbeddingModels = "text-embedding-3-small",
+        embedding_encoding: OpenAIEmbeddingEncodings = "cl100k_base",
+        encoding_format: OpenAIEncodingFormats = "float"
+    ):
         
         if client is None:
             if api_key is None:

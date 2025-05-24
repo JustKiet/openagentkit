@@ -10,11 +10,12 @@ from openagentkit.core.utils.audio_utils import AudioUtility
 from openagentkit.modules.openai import OpenAIAudioVoices
 
 class OpenAISpeechService(BaseSpeechModel):
-    def __init__(self,
-                 client: OpenAI,
-                 voice: OpenAIAudioVoices = "nova",
-                 stt_model: Literal["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"] = "whisper-1",
-                 ) -> None:
+    def __init__(
+        self,
+        client: OpenAI,
+        voice: OpenAIAudioVoices = "nova",
+        stt_model: Literal["whisper-1", "gpt-4o-transcribe", "gpt-4o-mini-transcribe"] = "whisper-1",
+    ) -> None:
         self._client = client
         self.voice = voice
         self.stt_model = stt_model
@@ -30,28 +31,28 @@ class OpenAISpeechService(BaseSpeechModel):
         )
         return response.text
     
-    def speech_to_text(self, audio_data: bytes) -> str:
+    def speech_to_text(self, audio_bytes: bytes) -> str:
         """
-        Convert speech audio data to text using OpenAI's API.
+        Convert speech audio bytes to text using OpenAI's API.
 
         Args:
-            audio_data (bytes): The audio data to convert to text.
+            audio_bytes (bytes): The audio bytes to convert to text.
 
         Returns:
             str: The text transcription of the audio data.
         """
         try:
             # Detect the audio format
-            audio_format = AudioUtility.detect_audio_format(audio_data)
+            audio_format = AudioUtility.detect_audio_format(audio_bytes)
             logger.info(f"Detected audio format: {audio_format}")
             
             # Direct handling for WAV format
-            if audio_format == "wav" and AudioUtility.validate_wav(audio_data):
-                return self._transcribe_audio(audio_data, "audio.wav")
+            if audio_format == "wav" and AudioUtility.validate_wav(audio_bytes):
+                return self._transcribe_audio(audio_bytes, "audio.wav")
                 
             # WebM conversion (most common from browsers)
             if audio_format == "webm":
-                converted_wav = AudioUtility.convert_audio_format(audio_data, "webm", "wav")
+                converted_wav = AudioUtility.convert_audio_format(audio_bytes, "webm", "wav")
                 if converted_wav:
                     return self._transcribe_audio(converted_wav, "converted_audio.wav")
             
@@ -61,7 +62,7 @@ class OpenAISpeechService(BaseSpeechModel):
                 try:
                     # Create temp file with appropriate extension
                     with tempfile.NamedTemporaryFile(suffix=f'.{audio_format}', delete=False) as temp_file:
-                        temp_file.write(audio_data)
+                        temp_file.write(audio_bytes)
                         temp_path = temp_file.name
                     
                     # Try direct transcription
@@ -79,12 +80,12 @@ class OpenAISpeechService(BaseSpeechModel):
                             pass
                             
                     # Try WAV conversion
-                    converted_wav = AudioUtility.convert_audio_format(audio_data, audio_format, "wav")
+                    converted_wav = AudioUtility.convert_audio_format(audio_bytes, audio_format, "wav")
                     if converted_wav:
                         return self._transcribe_audio(converted_wav, "converted_audio.wav")
             
             # Raw PCM or unknown formats - convert to WAV
-            wav_data = AudioUtility.raw_bytes_to_wav(audio_data).getvalue()
+            wav_data = AudioUtility.raw_bytes_to_wav(audio_bytes).getvalue()
             try:
                 return self._transcribe_audio(wav_data, "audio.wav")
             except Exception:
@@ -92,7 +93,7 @@ class OpenAISpeechService(BaseSpeechModel):
                 temp_path = None
                 try:
                     with tempfile.NamedTemporaryFile(suffix='.mp3', delete=False) as temp_file:
-                        temp_file.write(audio_data)
+                        temp_file.write(audio_bytes)
                         temp_path = temp_file.name
                     
                     with open(temp_path, 'rb') as f:
