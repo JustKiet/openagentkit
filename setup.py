@@ -1,16 +1,44 @@
 from setuptools import setup, find_packages
+from itertools import chain
 
-with open('requirements.txt') as f:
-    requirements = f.read().splitlines()
+with open('requirements/requirements-core.txt') as f:
+    requirements_core = f.read().splitlines()
+
+with open('requirements/requirements-mcp.txt') as f:
+    requirements_mcp = f.read().splitlines()
+
+with open('requirements/requirements-openai.txt') as f:
+    requirements_openai = f.read().splitlines()
+
+with open('requirements/requirements-milvus.txt') as f:
+    requirements_milvus = f.read().splitlines()
+
+with open('requirements/requirements-voyageai.txt') as f:
+    requirements_voyageai = f.read().splitlines()
 
 with open('README.md', encoding='utf-8') as f:
     long_description = f.read()
+
+requirements_all = sorted(set(chain(
+    requirements_core,
+    requirements_mcp,
+    requirements_openai,
+    requirements_milvus,
+    requirements_voyageai
+)))
 
 setup(
     name='openagentkit',
     version='0.1.0.dev19',
     packages=find_packages(),
-    install_requires=requirements,
+    install_requires=requirements_core,
+    extras_require={
+        'mcp': requirements_mcp,
+        'openai': requirements_openai,
+        'milvus': requirements_milvus,
+        'voyageai': requirements_voyageai,
+        'all': requirements_all,
+    },
     include_package_data=True,
     author='Kiet Do',
     author_email='kietdohuu@gmail.com',

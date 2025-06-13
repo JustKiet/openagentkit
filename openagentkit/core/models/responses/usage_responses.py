@@ -1,4 +1,22 @@
 from pydantic import BaseModel
+from typing import Optional
+
+class CachedTokensDetails(BaseModel):
+    """
+    The details of the cached tokens.
+
+    Schema:
+        ```python
+        class CachedTokensDetails(BaseModel):
+            text_tokens: int
+            audio_tokens: int
+        ```
+    Where:
+        - text_tokens: The cached text tokens.
+        - audio_tokens: The cached audio tokens.
+    """
+    text_tokens: Optional[int] = None
+    audio_tokens: Optional[int] = None
 
 class PromptTokensDetails(BaseModel):
     """
@@ -8,14 +26,20 @@ class PromptTokensDetails(BaseModel):
         ```python
         class PromptTokensDetails(BaseModel):
             cached_tokens: int
+            text_tokens: int
             audio_tokens: int
+            cached_tokens_details: CachedTokensDetails
         ```
     Where:
         - `cached_tokens`: The cached tokens.
+        - `text_tokens`: The text tokens.
         - `audio_tokens`: The audio tokens.
+        - `cached_tokens_details`: The cached tokens details. Is a nested model of type `CachedTokensDetails`.
     """
-    cached_tokens: int
-    audio_tokens: int
+    cached_tokens: Optional[int] = None
+    text_tokens: Optional[int] = None
+    audio_tokens: Optional[int] = None
+    cached_tokens_details: Optional[CachedTokensDetails] = None
 
 class CompletionTokensDetails(BaseModel):
     """
@@ -35,10 +59,11 @@ class CompletionTokensDetails(BaseModel):
         - `accepted_prediction_tokens`: The accepted prediction tokens.
         - `rejected_prediction_tokens`: The rejected prediction tokens.
     """
-    reasoning_tokens: int
-    audio_tokens: int
-    accepted_prediction_tokens: int
-    rejected_prediction_tokens: int
+    reasoning_tokens: Optional[int] = None
+    text_tokens: Optional[int] = None
+    audio_tokens: Optional[int] = None
+    accepted_prediction_tokens: Optional[int] = None
+    rejected_prediction_tokens: Optional[int] = None
 
 class UsageResponse(BaseModel):
     """
@@ -63,5 +88,5 @@ class UsageResponse(BaseModel):
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
-    prompt_tokens_details: PromptTokensDetails
-    completion_tokens_details: CompletionTokensDetails
+    prompt_tokens_details: Optional[PromptTokensDetails] = None
+    completion_tokens_details: Optional[CompletionTokensDetails] = None

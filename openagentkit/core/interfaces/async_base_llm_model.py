@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from pydantic import BaseModel
-from typing import Optional, AsyncGenerator, List, Dict
+from typing import Optional, AsyncGenerator, List, Dict, Any
 
 class AsyncBaseLLMModel(ABC):
     """
@@ -20,13 +20,11 @@ class AsyncBaseLLMModel(ABC):
         `top_p`: A property to get and set the top-p sampling parameter.
     """
     def __init__(self,
-                 temperature: Optional[float] = 0.3,
+                 temperature: Optional[float] = None,
                  max_tokens: Optional[int] = None,
                  top_p: Optional[float] = None,
-                 *args,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self._temperature = temperature
+                ) -> None:
+        self._temperature = temperature if temperature is not None else 1.0
         self._max_tokens = max_tokens
         self._top_p = top_p
 
@@ -38,14 +36,14 @@ class AsyncBaseLLMModel(ABC):
         return self._temperature
 
     @property
-    def max_tokens(self) -> int:
+    def max_tokens(self) -> int | None:
         """
         A property to get and set the maximum number of tokens for the response.
         """
         return self._max_tokens
     
     @property
-    def top_p(self) -> float:
+    def top_p(self) -> float | None:
         """
         A property to get and set the top-p sampling parameter.
         """
@@ -89,11 +87,11 @@ class AsyncBaseLLMModel(ABC):
     @abstractmethod
     async def model_generate(self,
                              messages: List[Dict[str, str]],
-                             response_schema: Optional[BaseModel] = None,
+                             response_schema: Optional[type[BaseModel]] = None,
                              temperature: Optional[float] = None,
                              max_tokens: Optional[int] = None,
                              top_p: Optional[float] = None,
-                             **kwargs) -> OpenAgentResponse:
+                             **kwargs: Any) -> OpenAgentResponse:
         """
         An abstract method to generate a response from the LLM model.
 
@@ -118,11 +116,11 @@ class AsyncBaseLLMModel(ABC):
     @abstractmethod
     async def model_stream(self,
                            messages: List[Dict[str, str]],
-                           response_schema: Optional[BaseModel] = None,
+                           response_schema: Optional[type[BaseModel]] = None,
                            temperature: Optional[float] = None,
                            max_tokens: Optional[int] = None,
                            top_p: Optional[float] = None,
-                           **kwargs) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
+                           **kwargs: Any) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
         """
         An abstract method to stream a response from the LLM model.
         
@@ -142,4 +140,6 @@ class AsyncBaseLLMModel(ABC):
         Returns:
             AsyncGenerator[OpenAgentStreamingResponse, None]: The streamed response.
         """
+        if False:
+            yield
         raise NotImplementedError

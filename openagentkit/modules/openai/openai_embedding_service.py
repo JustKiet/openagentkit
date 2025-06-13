@@ -3,60 +3,38 @@ from openai import OpenAI
 from openagentkit.core.interfaces.base_embedding_model import BaseEmbeddingModel
 from openagentkit.core.models.io.embeddings import EmbeddingUnit
 from openagentkit.core.models.responses import EmbeddingResponse
-from typing import Literal, Union
+from openagentkit.modules.openai import OpenAIEmbeddingModels, OpenAIEmbeddingEncodings, OpenAIEncodingFormats
+from typing import Literal, Union, Optional, overload
 import os
 
-class OpenAIEmbeddingModel(BaseEmbeddingModel):
-    def __init__(self, 
-                 client: OpenAI = None,
-                 api_key: str = os.getenv("OPENAI_API_KEY"),
-                 embedding_model: Literal[
-                     "text-embedding-3-small", 
-                     "text-embedding-3-large", 
-                     "text-embedding-ada-002",
-                 ] = "text-embedding-3-small",
-                 embedding_encoding: str = "cl100k_base",
-                 encoding_format: Literal["float", "base64"] = "float"):
-        self.client = client
-        if self.client is None:
+class OpenAIEmbeddingModel(BaseEmbeddingModel[int]):
+    def __init__(
+        self, 
+        client: Optional[OpenAI] = None,
+        api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
+        embedding_model: OpenAIEmbeddingModels = "text-embedding-3-small",
+        embedding_encoding: OpenAIEmbeddingEncodings = "cl100k_base",
+        encoding_format: OpenAIEncodingFormats = "float"
+    ):
+        
+        if client is None:
             if api_key is None:
                 raise ValueError("No API key provided. Please set the OPENAI_API_KEY environment variable or pass it as an argument.")
-            self.client = OpenAI(api_key=api_key)
+            self._client = OpenAI(api_key=api_key)
+        else:
+            self._client = client
 
-        self.embedding_model = embedding_model
-        self.embedding_encoding = embedding_encoding
-        self.encoding_format = encoding_format
+        self._embedding_model: OpenAIEmbeddingModels = embedding_model
+        self._embedding_encoding: OpenAIEmbeddingEncodings = embedding_encoding
+        self._encoding_format: OpenAIEncodingFormats = encoding_format
 
-        match self.embedding_model:
+        match self._embedding_model:
             case "text-embedding-3-small":
                 self._dimensions = 1536
             case "text-embedding-3-large":
                 self._dimensions = 3072
-            case " EmbeddingUnit: The embedding unit.text-embedding-ada-002":
+            case "text-embedding-ada-002":
                 self._dimensions = 1536
-
-        self._encoding_format = encoding_format
-
-    @property
-    def encoding_format(self) -> str:
-        """
-        Get the encoding format.
-        Returns:
-            The encoding format.
-        """
-        return self._encoding_format
-    
-    @encoding_format.setter
-    def encoding_format(self, value: str) -> None:
-        """
-        Set the encoding format.
-        Args:
-            value: The encoding format to set. Can be "float" or "base64".
-        """
-        if value not in ["float", "base64"]:
-            raise ValueError("Invalid encoding format. Must be 'float' or 'base64'.")
-        self._encoding_format = value
-        return self._encoding_format
     
     @property
     def embedding_model(self) -> str:
@@ -68,13 +46,13 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         return self._embedding_model
     
     @embedding_model.setter
-    def embedding_model(self, value: str) -> None:
+    def embedding_model(self, value: OpenAIEmbeddingModels) -> None:
         """
         Set the embedding model.
         Args:
             value: The embedding model to set.
         """
-        if value not in ["text-embedding-3-small", "text-embedding-3-large", "text-embedding-ada-002"]:
+        if value not in list(OpenAIEmbeddingModels.__args__):
             raise ValueError("Invalid embedding model. Must be 'text-embedding-3-small', 'text-embedding-3-large', or 'text-embedding-ada-002'.")
         self._embedding_model = value
     
@@ -88,7 +66,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         return self._embedding_encoding
     
     @embedding_encoding.setter
-    def embedding_encoding(self, value: str) -> None:
+    def embedding_encoding(self, value: OpenAIEmbeddingEncodings) -> None:
         """
         Set the embedding encoding.
         Args:
@@ -108,13 +86,13 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         return self._encoding_format
     
     @encoding_format.setter
-    def encoding_format(self, value: str) -> None:
+    def encoding_format(self, value: OpenAIEncodingFormats) -> None:
         """
         Set the encoding format.
         Args:
             value: The encoding format to set. Can be "float" or "base64".
         """
-        if value not in ["float", "base64"]:
+        if value not in list(OpenAIEncodingFormats.__args__):
             raise ValueError("Invalid encoding format. Must be 'float' or 'base64'.")
         self._encoding_format = value
 
@@ -163,12 +141,24 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         embedding_response: EmbeddingResponse = self.encode_texts(
             texts=[query],
             include_metadata=True
-        )
+        ) # type: ignore
 
         if include_metadata:
             return embedding_response
         else:
             return embedding_response.embeddings[0]
+
+    @overload
+    def encode_texts(self,
+                     texts: list[str],
+                     include_metadata: Literal[False]) -> list[EmbeddingUnit]:
+        ...
+
+    @overload
+    def encode_texts(self,
+                     texts: list[str],
+                     include_metadata: Literal[True]) -> EmbeddingResponse:
+        ...
 
     def encode_texts(self, 
                      texts: list[str],
@@ -215,10 +205,10 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
             text = text.replace("\n", " ")
             formatted_texts.append(text)
 
-        response = self.client.embeddings.create(
+        response = self._client.embeddings.create(
             model=self.embedding_model,
             input=formatted_texts,
-            encoding_format=self.encoding_format,
+            encoding_format=self._encoding_format,
         )
 
         embeddings: list[EmbeddingUnit] = []
@@ -230,7 +220,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
                     object=embedding.object,
                     content=formatted_texts[embedding.index],
                     embedding=embedding.embedding,
-                    type=self.encoding_format
+                    type=self._encoding_format
                 )
             )
 
@@ -263,7 +253,7 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel):
         """
         encoder = tiktoken.get_encoding(self.embedding_encoding)
 
-        tokens: list[int] = []
+        tokens: list[list[int]] = []
 
         for text in texts:
             tokens.append(encoder.encode(text))

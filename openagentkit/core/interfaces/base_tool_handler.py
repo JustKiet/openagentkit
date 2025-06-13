@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from openagentkit.core.models.responses import OpenAgentStreamingResponse, OpenAgentResponse
-from openagentkit.core.models.tool_responses import ToolResponse
-from typing import Union, Any
+from openagentkit.core.models.responses.tool_response import ToolResponse, ToolCallResponse
+from typing import Union
 
 class BaseToolHandler(ABC):
     @abstractmethod
-    def parse_tool_args(self, response: dict) -> list[dict[str, Any]]:
+    def parse_tool_args(self, response: OpenAgentResponse) -> list[ToolCallResponse]:
         """
         Parse the tool calls from the response.
 

@@ -1,4 +1,4 @@
-from typing import Any, Callable, Dict, List, Optional, Generator
+from typing import Any, Dict, List, Optional, Generator
 import os
 from loguru import logger
 from openai._types import NOT_GIVEN
@@ -6,20 +6,24 @@ from openai import OpenAI
 from openagentkit.core.interfaces.base_executor import BaseExecutor
 from openagentkit.modules.openai import OpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.core.handlers import ToolHandler
+from openagentkit.core.handlers.tools.tool_handler import ToolHandler
+from openagentkit.core.handlers.tools.tool_wrapper import Tool
+from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from pydantic import BaseModel
 
 class OpenAIExecutor(BaseExecutor):
-    def __init__(self,
-                 client: OpenAI = None,
-                 model: str = "gpt-4o-mini",
-                 system_message: Optional[str] = None,
-                 tools: Optional[List[Callable[..., Any]]] = NOT_GIVEN,
-                 api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-                 temperature: Optional[float] = 0.3,
-                 max_tokens: Optional[int] = None,
-                 top_p: Optional[float] = None,
-                 **kwargs):
+    def __init__(
+        self,
+        client: Optional[OpenAI] = None,
+        model: str = "gpt-4o-mini",
+        system_message: Optional[str] = None,
+        tools: Optional[List[Tool]] = None,
+        api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
+        temperature: Optional[float] = 0.3,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        **kwargs: Any
+    ) -> None:
         context_history = kwargs.get("context_history", None)
         super().__init__(system_message=system_message, context_history=context_history)
 
@@ -37,30 +41,26 @@ class OpenAIExecutor(BaseExecutor):
             tools=tools, llm_provider="openai", schema_type="OpenAI"
         )
 
+        self._tools = tools
+
     @property
     def model(self) -> str:
-        """
-        Get the model name.
-
-        Returns:
-            The model name.
-        """
-        return self._llm_service._model
+        return self._llm_service.model
 
     @property
     def temperature(self) -> float:
         return self._llm_service.temperature
 
     @property
-    def max_tokens(self) -> int:
+    def max_tokens(self) -> int | None:
         return self._llm_service.max_tokens
     
     @property
-    def top_p(self) -> float:
+    def top_p(self) -> float | None:
         return self._llm_service.top_p
     
     @property
-    def tools(self) -> List[Dict[str, Any]]:
+    def tools(self) -> List[Dict[str, Any]] | None:
         return self._llm_service.tools
     
     def clone(self) -> 'OpenAIExecutor':
@@ -73,33 +73,40 @@ class OpenAIExecutor(BaseExecutor):
         return OpenAIExecutor(
             client=self._llm_service.client,
             model=self._llm_service.model,
-            system_message=self._llm_service.system_message,
-            tools=self._llm_service.tools,
+            system_message=self._system_message,
+            tools=self._tools,
             api_key=self._llm_service.api_key,
             temperature=self.temperature,
             max_tokens=self.max_tokens,
             top_p=self.top_p,
         )
 
-    def execute(self, 
-                messages: List[Dict[str, str]],
-                tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
-                response_schema: Optional[BaseModel] = NOT_GIVEN,
-                temperature: Optional[float] = None,
-                max_tokens: Optional[int] = None,
-                top_p: Optional[float] = None,
-                **kwargs,
-               ) -> Generator[OpenAgentResponse, None, None]:
+    def execute(
+        self, 
+        messages: List[Dict[str, str]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        response_schema: Optional[type[BaseModel]] = None,
+        audio: Optional[bool] = False,
+        audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+        audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        **kwargs: Any,
+    ) -> Generator[OpenAgentResponse, None, None]:
         """
         Execute the OpenAI model and return an OpenAgentResponse object.
 
         Args:
             messages (List[Dict[str, str]]): The messages to send to the model.
             tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
-            response_schema (Optional[BaseModel]): The schema to use in the response.
             temperature (Optional[float]): The temperature to use in the response.
             max_tokens (Optional[int]): The maximum number of tokens to use in the response.
             top_p (Optional[float]): The top p to use in the response.
+            response_schema (Optional[type[BaseModel]]): The schema to use in the response.
+            audio (Optional[bool]): Whether to use audio in the response.
+            audio_format (Optional[OpenAIAudioFormats]): The audio format to use in the response.
+            audio_voice (Optional[OpenAIAudioVoices]): The audio voice to use in the response.
 
         Returns:
             An OpenAgentResponse generator.
@@ -136,6 +143,9 @@ class OpenAIExecutor(BaseExecutor):
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
+                audio=audio,
+                audio_format=audio_format,
+                audio_voice=audio_voice,
             )
 
             logger.info(f"Response Received: {response}") if debug else None
@@ -149,14 +159,16 @@ class OpenAIExecutor(BaseExecutor):
                     }
                 )
 
-            tool_results = []
+            tool_results: list[Any] = []
             
             if response.tool_calls:
                 # Add the tool call request to the context
+                tool_calls: list[dict[str, str]] = [tool_call.model_dump() for tool_call in response.tool_calls]
+
                 context = self.add_context(
                     {
                         "role": response.role,
-                        "tool_calls": response.tool_calls,
+                        "tool_calls": tool_calls,
                         "content": str(response.content),
                     }
                 )
@@ -181,7 +193,7 @@ class OpenAIExecutor(BaseExecutor):
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
+                context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
 
                 logger.debug(f"Context: {context}") if debug else None
             else:
@@ -210,22 +222,26 @@ class OpenAIExecutor(BaseExecutor):
                 )
                 
 
-    def stream_execute(self, 
-                      messages: List[Dict[str, str]],
-                      tools: Optional[List[Dict[str, Any]]] = NOT_GIVEN,
-                      response_schema: Optional[BaseModel] = NOT_GIVEN,
-                      temperature: Optional[float] = 0.3,
-                      max_tokens: Optional[int] = None,
-                      top_p: Optional[float] = None,
-                      **kwargs,
-                      ) -> Generator[OpenAgentStreamingResponse, None, None]:
+    def stream_execute(
+        self, 
+        messages: List[Dict[str, str]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
+        top_p: Optional[float] = None,
+        response_schema: Optional[type[BaseModel]] = None,
+        audio: Optional[bool] = False,
+        audio_format: Optional[OpenAIAudioFormats] = "pcm16",
+        audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        **kwargs: Any,
+    ) -> Generator[OpenAgentStreamingResponse, None, None]:
         """
         Stream execute the OpenAI model and return an OpenAgentStreamingResponse object.
 
         Args:
             messages (List[Dict[str, str]]): The messages to send to the model.
             tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
-            response_schema (Optional[BaseModel]): The schema to use in the response.
+            response_schema (Optional[type[BaseModel]]): The schema to use in the response.
             temperature (Optional[float]): The temperature to use in the response.
             max_tokens (Optional[int]): The maximum number of tokens to use in the response.
             top_p (Optional[float]): The top p to use in the response.
@@ -252,7 +268,7 @@ class OpenAIExecutor(BaseExecutor):
 
         stop = False
 
-        context = self.extend_context(messages)
+        context: list[dict[str, Any]] = self.extend_context(messages)
 
         while not stop:
 
@@ -265,6 +281,9 @@ class OpenAIExecutor(BaseExecutor):
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
+                audio=audio,
+                audio_format=audio_format,
+                audio_voice=audio_voice,
             )
             
             for chunk in response_generator:
@@ -305,7 +324,7 @@ class OpenAIExecutor(BaseExecutor):
 
                     logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
                     
-                    context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages])
+                    context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
                     
                     logger.debug(f"Context in Stream Execute: {context}") if debug else None
 

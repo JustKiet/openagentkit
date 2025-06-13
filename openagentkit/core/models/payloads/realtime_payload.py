@@ -25,13 +25,13 @@ class RealtimeTurnDetectionConfig(BaseModel):
     type: Literal["server_vad"] = "server_vad"
 
     @field_validator("threshold")
-    def validate_threshold(cls, v):
+    def validate_threshold(cls, v: float) -> float:
         if v < 0.0 or v > 1.0:
             raise ValueError("Threshold must be between 0.0 and 1.0")
         return v
 
 class RealtimeSessionPayload(BaseModel):
-    input_audio_format: Literal["pcm16, g711_ulaw, g711_alow"] = "pcm16"
+    input_audio_format: Literal["pcm16", "g711_ulaw", "g711_alow"] = "pcm16"
     input_audio_noise_reduction: Optional[ReatimeNoiseReductionConfig] = None
     input_audio_transcription: Optional[RealtimeInputAudioTranscriptionConfig] = None
     instructions: Optional[str] = None
@@ -43,7 +43,7 @@ class RealtimeSessionPayload(BaseModel):
     tool_choice: Optional[Literal["auto", "none", "required"]] = None
     tools: Optional[List[RealtimeToolDetail]] = None
     turn_detection: Optional[RealtimeTurnDetectionConfig] = None
-    voice: Literal["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"] = None
+    voice: Optional[Literal["alloy", "ash", "ballad", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer", "verse"]] = None
 
 class RealtimeClientPayload(BaseModel):
     event_id: Optional[str] = None
