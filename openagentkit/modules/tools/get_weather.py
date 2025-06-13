@@ -1,5 +1,5 @@
 from typing import Annotated, Union, Literal, Optional
-from openagentkit.core.handlers.tools.tool_wrapper import Tool import tool
+from openagentkit.core.handlers.tools.tool_wrapper import tool
 import os
 import requests
 from openagentkit.core.models.tool_responses import WeatherForecast, CurrentWeather, WeatherResponse

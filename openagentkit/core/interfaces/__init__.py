@@ -10,4 +10,3 @@ from .async_base_embedding_model import AsyncBaseEmbeddingModel # type: ignore
 from .base_tool_handler import BaseToolHandler # type: ignore
 from .async_reranker_model import AsyncBaseRerankerModel # type: ignore
 from .base_reranker_model import BaseRerankerModel # type: ignore
-from .base_vector_repository import BaseVectorRepository # type: ignore
