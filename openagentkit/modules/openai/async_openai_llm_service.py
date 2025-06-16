@@ -21,7 +21,9 @@ from openagentkit.core.models.responses.audio_response import AudioResponse
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from typing import AsyncGenerator
 import os
-from loguru import logger
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AsyncOpenAILLMService(AsyncBaseLLMModel):
     def __init__(

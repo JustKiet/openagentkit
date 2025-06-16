@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Generator
 import os
-from loguru import logger
+import logging
 from openai import OpenAI
 from openagentkit.core.interfaces.base_agent import BaseAgent
 from openagentkit.modules.openai import OpenAILLMService
@@ -9,6 +9,8 @@ from openagentkit.core.tools.tool_handler import ToolHandler
 from openagentkit.core.tools.base_tool import Tool
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
 
 class OpenAIAgent(BaseAgent):
     def __init__(

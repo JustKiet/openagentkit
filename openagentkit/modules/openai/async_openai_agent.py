@@ -1,6 +1,5 @@
 from typing import Any, AsyncGenerator, Dict, List, Optional
 import os
-from loguru import logger
 from openai import AsyncOpenAI
 from openagentkit.core.interfaces.async_base_agent import AsyncBaseAgent
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
@@ -10,6 +9,9 @@ from openagentkit.core.tools.base_tool import Tool
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from pydantic import BaseModel
 from mcp import ClientSession
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AsyncOpenAIAgent(AsyncBaseAgent):
     def __init__(
