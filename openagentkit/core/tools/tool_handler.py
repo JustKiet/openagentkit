@@ -23,7 +23,7 @@ class ToolHandler:
             self._tools = []
             for tool in tools:
                 if not hasattr(tool, "schema"):
-                    raise ValueError(f"Function '{tool.__name__}' does not have a `schema` attribute. Please wrap the function with `@tool` decorator from `openagentkit.core.utils.tool_wrapper`.")
+                    raise ValueError(f"Function '{tool.__name__}' does not have a `schema` attribute. Please wrap the function with `@tool` decorator from `openagentkit.core.tools.base_tool`.")
                 self._tools.append(tool.schema)
                 self.tools_map = {
                     tool.schema["function"]["name"]: tool for tool in tools
@@ -173,7 +173,6 @@ class ToolHandler:
         tool_args_list: list[dict[str, Any]] = []
         tool_results_list: list[ToolCallResult] = []
         tool_messages_list: list[ToolCallMessage] = []
-        notifications_list: list[str] = []
 
         # Handle tool calls 
         for tool_call in tool_calls:
@@ -217,14 +216,12 @@ class ToolHandler:
             tool_calls=tool_calls,
             tool_results=tool_results_list,
             tool_messages=tool_messages_list,
-            tool_notifications=notifications_list
         )
     
     def handle_tool_request(self, tool_calls: list[ToolCall]) -> ToolResponse:
         tool_args_list: list[dict[str, Any]] = []
         tool_results_list: list[ToolCallResult] = []
         tool_messages_list: list[ToolCallMessage] = []
-        notifications_list: list[str] = []
 
         # Handle tool calls 
         for tool_call in tool_calls:
@@ -237,12 +234,6 @@ class ToolHandler:
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse tool arguments for {tool_name}: {e}")
                     tool_args = {}
-            # Save notification value and remove _notification key from tool args if present
-            notification: Optional[str] = tool_args.get("_notification", None)
-
-            if notification:
-                notifications_list.append(notification)
-                tool_args.pop("_notification", None)
             
             # Handle the tool call (execute the tool)
             tool_result = self._handle_tool_call(tool_name, **tool_args)
@@ -274,6 +265,5 @@ class ToolHandler:
             tool_calls=tool_calls,
             tool_results=tool_results_list,
             tool_messages=tool_messages_list,
-            tool_notifications=notifications_list
         )
     

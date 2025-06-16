@@ -16,7 +16,6 @@ class OpenAIEmbeddingModel(BaseEmbeddingModel[int]):
         embedding_encoding: OpenAIEmbeddingEncodings = "cl100k_base",
         encoding_format: OpenAIEncodingFormats = "float"
     ):
-        
         if client is None:
             if api_key is None:
                 raise ValueError("No API key provided. Please set the OPENAI_API_KEY environment variable or pass it as an argument.")

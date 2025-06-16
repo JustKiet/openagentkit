@@ -1,6 +1,6 @@
-from typing import Any, Dict, List, Optional, Union, AsyncIterable, cast
+from typing import Any, Dict, List, Optional, AsyncIterable, cast
 from openai import AsyncOpenAI
-from openai._types import NOT_GIVEN, NotGiven
+from openai._types import NOT_GIVEN
 from openai.types.chat.chat_completion_chunk import ChatCompletionChunk, ChoiceDeltaToolCall
 from openai.types.chat.chat_completion_stream_options_param import ChatCompletionStreamOptionsParam
 from openai.types.chat.chat_completion_audio_param import ChatCompletionAudioParam
@@ -128,8 +128,8 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
     async def _handle_client_request(
         self,
         messages: List[Dict[str, str]],
-        tools: Optional[Union[List[Dict[str, Any]], NotGiven]] = None,
-        response_schema: Union[type[BaseModel], NotGiven] = NOT_GIVEN,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        response_schema: Optional[type[BaseModel]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
@@ -141,16 +141,18 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         """
         Handle the client request.
 
-        Args:
-            messages: The messages to send to the model.
-            tools: The tools to use in the response.
-            response_schema: The schema to use in the response.
-            temperature: The temperature to use in the response.
-            max_tokens: The max tokens to use in the response.
-            top_p: The top p to use in the response.
-
-        Returns:
-            An OpenAgentResponse object.
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[list[dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response. **(not implemented yet)**
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The max tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[bool] audio: Whether to include audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param kwargs: Additional keyword arguments.
+        :return: An OpenAgentResponse object.
+        :rtype: OpenAgentResponse
         """
 
         temperature = kwargs.get("temperature", temperature)
@@ -166,14 +168,14 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             top_p = self.top_p
 
         if tools is None:
-            tools = NOT_GIVEN
+            tools = self.tools
 
-        if response_schema is NOT_GIVEN or isinstance(response_schema, NotGiven):
+        if response_schema is None:
             # Handle the client request without response schema
             client_response = await self._client.chat.completions.create(
                 model=self._model,
                 messages=messages, # type: ignore
-                tools=tools, # type: ignore
+                tools=tools if tools is not None else NOT_GIVEN, # type: ignore
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
@@ -281,19 +283,18 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         """
         Handle the client stream.
 
-        Args:
-            messages: The messages to send to the model.
-            tools: The tools to use in the response.
-            response_schema: The schema to use in the response. **(not implemented yet)**
-            temperature: The temperature to use in the response.
-            max_tokens: The max tokens to use in the response.
-            top_p: The top p to use in the response.
-            audio: Whether to include audio in the response.
-            audio_format: The audio format to use in the response.
-            audio_voice: The audio voice to use in the response.
-
-        Returns:
-            An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[list[dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response. **(not implemented yet)**
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The max tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[bool] audio: Whether to include audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param kwargs: Additional keyword arguments.
+        :return: An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        :rtype: AsyncGenerator[OpenAgentStreamingResponse, None]
         """
         # TODO: THIS IS A PLACEHOLDER FOR NOW, WE NEED TO IMPLEMENT THE STREAMING FOR THE RESPONSE SCHEMA
         if isinstance(response_schema, BaseModel):
@@ -467,28 +468,18 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         """
         Generate a response from the model.
         
-        Args:
-            messages: The messages to send to the model.
-            tools: The tools to use in the response.
-            response_schema: The schema to use in the response.
-            temperature: The temperature to use in the response.
-            max_tokens: The max tokens to use in the response.
-            top_p: The top p to use in the response.
-            audio: Whether to include audio in the response.
-            audio_format: The audio format to use in the response.
-            audio_voice: The audio voice to use in the response.
-
-        Returns:
-            An OpenAgentResponse object.
-
-        Example:
-        ```python
-        from openagentkit.tools import duckduckgo_search_tool
-        from openagentkit.modules.openai import AsyncOpenAILLMService
-
-        llm_service = AsyncOpenAILLMService(client, tools=[duckduckgo_search_tool])
-        response = await llm_service.model_generate(messages=[{"role": "user", "content": "What is TECHVIFY?"}])
-        ```
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[list[dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response. **(not implemented yet)**
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The max tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[bool] audio: Whether to include audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param kwargs: Additional keyword arguments.
+        :return: An OpenAgentResponse object.
+        :rtype: OpenAgentResponse
         """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
@@ -510,7 +501,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         # Handle the client request
         response = await self._handle_client_request(
             messages=messages, 
-            response_schema=response_schema if response_schema else NOT_GIVEN, 
+            response_schema=response_schema if response_schema else None, 
             tools=tools,
             temperature=temperature,
             max_tokens=max_tokens,
@@ -538,19 +529,18 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         """
         Generate a response from the model.
 
-        Args:
-            messages: The messages to send to the model.
-            tools: The tools to use in the response.
-            response_schema: The schema to use in the response. **(not implemented yet)**
-            temperature: The temperature to use in the response.
-            max_tokens: The max tokens to use in the response.
-            top_p: The top p to use in the response.
-            audio: Whether to include audio in the response.
-            audio_format: The audio format to use in the response.
-            audio_voice: The audio voice to use in the response.
-
-        Returns:
-            An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[list[dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response. **(not implemented yet)**
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The max tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[bool] audio: Whether to include audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param kwargs: Additional keyword arguments.
+        :return: An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        :rtype: AsyncGenerator[OpenAgentStreamingResponse, None]
         """
         # TODO: Handle the case with response schema (not working)
         if isinstance(response_schema, BaseModel):

@@ -1,7 +1,6 @@
 from typing import Any, AsyncGenerator, Dict, List, Optional
 import os
 from loguru import logger
-from openai._types import NOT_GIVEN
 from openai import AsyncOpenAI
 from openagentkit.core.interfaces.async_base_agent import AsyncBaseAgent
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
@@ -13,31 +12,6 @@ from pydantic import BaseModel
 from mcp import ClientSession
 
 class AsyncOpenAIAgent(AsyncBaseAgent):
-    """
-    An asynchronous Agent (agentic) module for OpenAI models.
-
-    Args:
-        client (AsyncOpenAI): The AsyncOpenAI client.
-        model (str): The model to use. (default: "gpt-4o-mini")
-        system_message (Optional[str]): The system message to use. (default: None)
-        tools (Optional[List[Callable[..., Any]]]): The tools to use. (default: NOT_GIVEN)
-        api_key (Optional[str]): The API key to use. (default: os.getenv("OPENAI_API_KEY"))
-        temperature (Optional[float]): The temperature to use. (default: 0.3)
-        max_tokens (Optional[int]): The maximum number of tokens to use. (default: None)
-        top_p (Optional[float]): The top p to use. (default: None)
-
-    Example:
-    ```python
-    from openagentkit.modules.openai import AsyncOpenAIAgent
-    from openagentkit.tools import duckduckgo_search_tool
-    from openai import AsyncOpenAI
-
-    client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    agent = AsyncOpenAIAgent(client=client, tools=[duckduckgo_search_tool])
-    response = await agent.execute(messages=[{"role": "user", "content": "What is Quantum Mechanics?"}])
-    ```
-
-    """
     def __init__(
         self,
         client: Optional[AsyncOpenAI] = None,
@@ -124,33 +98,18 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         """
         Asynchronously execute the OpenAI model and return an OpenAgentResponse object.
 
-        Args:
-            messages (List[Dict[str, str]]): The messages to send to the model.
-            tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
-            response_schema (Optional[type[BaseModel]]): The schema to use in the response.
-            temperature (Optional[float]): The temperature to use in the response.
-            max_tokens (Optional[int]): The maximum number of tokens to use in the response.
-            top_p (Optional[float]): The top p to use in the response.
-            audio (Optional[bool]): Whether to use audio in the response.
-            audio_format (Optional[Literal['wav', 'mp3', 'flac', 'opus', 'pcm16']]): The format to use in the response.
-            audio_voice (Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]]): The voice to use in the response.
-
-        Returns:
-            An OpenAgentResponse asynchronous generator.
-
-        Example:
-        ```python
-        from openagentkit.modules.openai import AsyncOpenAIAgent
-        from openagentkit.tools import duckduckgo_search_tool
-        from openai import AsyncOpenAI
-        
-        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        Agent = AsyncOpenAIAgent(client=client, tools=[duckduckgo_search_tool])
-        async for response in Agent.execute(
-            messages=[{"role": "user", "content": "What is Quantum Mechanics?"}]
-        ):
-            print(response)
-        ```
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param list[dict[str, Any]] tools: The tools to use in the response.
+        :param type[BaseModel] response_schema: The schema to use in the response.
+        :param float temperature: The temperature to use in the response.
+        :param int max_tokens: The maximum number of tokens to use in the response.
+        :param float top_p: The top p to use in the response.
+        :param bool audio: Whether to use audio in the response.
+        :param OpenAIAudioFormats audio_format: The format to use in the response.
+        :param OpenAIAudioVoices audio_voice: The voice to use in the response.
+        :param kwargs: Additional keyword arguments.
+        :return: An OpenAgentResponse asynchronous generator.
+        :rtype: AsyncGenerator[OpenAgentResponse, None]
         """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
@@ -166,8 +125,8 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         
         debug = kwargs.get("debug", False)
         
-        if tools == NOT_GIVEN:
-            tools = self._llm_service.tool_handler.tools
+        if not tools:
+            tools = self._llm_service.tools
         
         context: list[dict[str, Any]] = await self.extend_context(messages)
         
@@ -278,35 +237,18 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         """
         Asynchronously stream the OpenAI model and return an OpenAgentStreamingResponse object.
 
-        Args:
-            messages (List[Dict[str, str]]): The messages to send to the model.
-            tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
-            response_schema (Optional[BaseModel]): The schema to use in the response.
-            temperature (Optional[float]): The temperature to use in the response.
-            max_tokens (Optional[int]): The maximum number of tokens to use in the response.
-            top_p (Optional[float]): The top p to use in the response.
-            audio (Optional[bool]): Whether to use audio in the response.
-            audio_format (Optional[Literal['wav', 'mp3', 'flac', 'opus', 'pcm16']]): The format to use in the response.
-            audio_voice (Optional[Literal["alloy", "ash", "coral", "echo", "fable", "onyx", "nova", "sage", "shimmer"]]): The voice to use in the response.
-
-        Returns:
-            An OpenAgentStreamingResponse asynchronous generator.
-
-        Example:
-        ```python
-        from openagentkit.modules.openai import AsyncOpenAIAgent
-        from openagentkit.tools import duckduckgo_search_tool
-        from openai import AsyncOpenAI
-
-        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-        Agent = AsyncOpenAIAgent(client=client, tools=[duckduckgo_search_tool])
-
-        async for chunk in Agent.stream_execute(
-            messages=[{"role": "user", "content": "What is Quantum Mechanics?"}]
-        ):
-            print(chunk)
-        ```
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param list[dict[str, Any]] tools: The tools to use in the response.
+        :param type[BaseModel] response_schema: The schema to use in the response.
+        :param float temperature: The temperature to use in the response.
+        :param int max_tokens: The maximum number of tokens to use in the response.
+        :param float top_p: The top p to use in the response.
+        :param bool audio: Whether to use audio in the response.
+        :param OpenAIAudioFormats audio_format: The format to use in the response.
+        :param OpenAIAudioVoices audio_voice: The voice to use in the response.
+        :param kwargs: Additional keyword arguments.
+        :return: An OpenAgentStreamingResponse asynchronous generator.
+        :rtype: AsyncGenerator[OpenAgentStreamingResponse, None]
         """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
@@ -322,7 +264,7 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
             
         debug = kwargs.get("debug", False)
         
-        if tools == NOT_GIVEN:
+        if not tools:
             tools = self._llm_service.tools
 
         stop = False

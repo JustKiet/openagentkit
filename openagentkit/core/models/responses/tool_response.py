@@ -24,4 +24,3 @@ class ToolResponse(BaseModel):
     tool_calls: Optional[list[ToolCall]] = None
     tool_results: Optional[list[ToolCallResult]] = None
     tool_messages: Optional[list[ToolCallMessage]] = None
-    tool_notifications: Optional[list[str]] = None

@@ -16,12 +16,13 @@ class AsyncOpenAIEmbeddingModel(AsyncBaseEmbeddingModel[int]):
         embedding_encoding: OpenAIEmbeddingEncodings = "cl100k_base",
         encoding_format: OpenAIEncodingFormats = "float"
     ) -> None:
-        self._client = client
-        if self._client is None:
+        if client is None:
             if api_key is None:
                 raise ValueError("No API key provided. Please set the OPENAI_API_KEY environment variable or pass it as an argument.")
-            self.client = AsyncOpenAI(api_key=api_key)
-
+            self._client = AsyncOpenAI(api_key=api_key)
+        else:
+            self._client = client
+            
         self._embedding_model: OpenAIEmbeddingModels = embedding_model
         self._embedding_encoding: OpenAIEmbeddingEncodings = embedding_encoding
         self._encoding_format: OpenAIEncodingFormats = encoding_format
@@ -100,41 +101,11 @@ class AsyncOpenAIEmbeddingModel(AsyncBaseEmbeddingModel[int]):
         """
         Encode a query into an embedding.
 
-        Args:
-            query: A single query to encode.
-            include_metadata: Whether to include metadata in the response. (default: `False`)
-        Returns:
-            If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the query embedding.
-            
-            If `include_metadata` is `False`, return an `EmbeddingUnit` object containing the query embedding.
-        Schema:
-            ```python
-            class EmbeddingResponse(BaseModel):
-                embeddings: list[EmbeddingUnit] # List of embeddings
-                embedding_model: str # The embedding model used
-                total_tokens: int # The total number of tokens used
-
-            class EmbeddingUnit(BaseModel):
-                index: int # The index of the embedding
-                object: str # The object of the embedding
-                embedding: list[float] # The embedding vector
-            ```
-        Example:
-            ```python
-            from openagentkit.modules.openai import OpenAIEmbeddingModel
-
-            embedding_model = OpenAIEmbeddingModel()
-            embedding_response = embedding_model.encode_query(
-                query="Hello, world!", 
-                include_metadata=True
-            )
-            # Get the embedding
-            embedding: list[float] = embedding_response.embeddings[0].embedding
-            # Get the usage
-            total_tokens: int = embedding_response.total_tokens
-            # Get the embedding model
-            embedding_model: str = embedding_response.embedding_model
-            ```
+        :param str query: The query to encode.
+        :param bool include_metadata: Whether to include metadata in the response. (default: `False`)
+        :return: If `include_metadata` is `True`, return an `EmbeddingResponse` object containing the query embedding response.
+                 If `include_metadata` is `False`, return an `EmbeddingUnit` object containing the query embedding.
+        :rtype: Union[EmbeddingUnit, EmbeddingResponse]
         """
         embedding_response: EmbeddingResponse = await self.encode_texts(
             texts=[query],
@@ -191,7 +162,7 @@ class AsyncOpenAIEmbeddingModel(AsyncBaseEmbeddingModel[int]):
             text = text.replace("\n", " ")
             formatted_texts.append(text)
 
-        response = await self.client.embeddings.create(
+        response = await self._client.embeddings.create(
             model=self.embedding_model,
             input=formatted_texts,
             encoding_format=self._encoding_format,

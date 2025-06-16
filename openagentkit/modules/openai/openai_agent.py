@@ -1,7 +1,6 @@
 from typing import Any, Dict, List, Optional, Generator
 import os
 from loguru import logger
-from openai._types import NOT_GIVEN
 from openai import OpenAI
 from openagentkit.core.interfaces.base_agent import BaseAgent
 from openagentkit.modules.openai import OpenAILLMService
@@ -97,19 +96,18 @@ class OpenAIAgent(BaseAgent):
         """
         Execute the OpenAI model and return an OpenAgentResponse object.
 
-        Args:
-            messages (List[Dict[str, str]]): The messages to send to the model.
-            tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
-            temperature (Optional[float]): The temperature to use in the response.
-            max_tokens (Optional[int]): The maximum number of tokens to use in the response.
-            top_p (Optional[float]): The top p to use in the response.
-            response_schema (Optional[type[BaseModel]]): The schema to use in the response.
-            audio (Optional[bool]): Whether to use audio in the response.
-            audio_format (Optional[OpenAIAudioFormats]): The audio format to use in the response.
-            audio_voice (Optional[OpenAIAudioVoices]): The audio voice to use in the response.
-
-        Returns:
-            An OpenAgentResponse generator.
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[list[dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response.
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The maximum number of tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[bool] audio: Whether to return audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param kwargs: Additional keyword arguments.
+        :return: An OpenAgentResponse generator.
+        :rtype: Generator[OpenAgentResponse, None, None]
         """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
@@ -125,7 +123,7 @@ class OpenAIAgent(BaseAgent):
 
         debug = kwargs.get("debug", False)
         
-        if tools == NOT_GIVEN:
+        if not tools:
             tools = self._llm_service.tools
         
         context = self.extend_context(messages)
@@ -238,16 +236,18 @@ class OpenAIAgent(BaseAgent):
         """
         Stream execute the OpenAI model and return an OpenAgentStreamingResponse object.
 
-        Args:
-            messages (List[Dict[str, str]]): The messages to send to the model.
-            tools (Optional[List[Dict[str, Any]]]): The tools to use in the response.
-            response_schema (Optional[type[BaseModel]]): The schema to use in the response.
-            temperature (Optional[float]): The temperature to use in the response.
-            max_tokens (Optional[int]): The maximum number of tokens to use in the response.
-            top_p (Optional[float]): The top p to use in the response.
-
-        Returns:
-            An OpenAgentStreamingResponse generator.
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[list[dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response.
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The maximum number of tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[bool] audio: Whether to return audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param kwargs: Additional keyword arguments.
+        :return: An OpenAgentStreamingResponse generator.
+        :rtype: Generator[OpenAgentStreamingResponse, None, None]
         """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
@@ -263,7 +263,7 @@ class OpenAIAgent(BaseAgent):
 
         debug = kwargs.get("debug", False)
         
-        if tools == NOT_GIVEN:
+        if not tools:
             tools = self._llm_service.tools
 
         stop = False
