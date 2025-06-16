@@ -3,15 +3,15 @@ import os
 from loguru import logger
 from openai._types import NOT_GIVEN
 from openai import OpenAI
-from openagentkit.core.interfaces.base_executor import BaseExecutor
+from openagentkit.core.interfaces.base_agent import BaseAgent
 from openagentkit.modules.openai import OpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.core.handlers.tools.tool_handler import ToolHandler
-from openagentkit.core.handlers.tools.tool_wrapper import Tool
+from openagentkit.core.tools.tool_handler import ToolHandler
+from openagentkit.core.tools.base_tool import Tool
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from pydantic import BaseModel
 
-class OpenAIExecutor(BaseExecutor):
+class OpenAIAgent(BaseAgent):
     def __init__(
         self,
         client: Optional[OpenAI] = None,
@@ -38,7 +38,7 @@ class OpenAIExecutor(BaseExecutor):
         )
 
         self._tool_handler = ToolHandler(
-            tools=tools, llm_provider="openai", schema_type="OpenAI"
+            tools=tools
         )
 
         self._tools = tools
@@ -63,14 +63,14 @@ class OpenAIExecutor(BaseExecutor):
     def tools(self) -> List[Dict[str, Any]] | None:
         return self._llm_service.tools
     
-    def clone(self) -> 'OpenAIExecutor':
+    def clone(self) -> 'OpenAIAgent':
         """
-        Clone the OpenAIExecutor object.
+        Clone the OpenAIAgent object.
 
         Returns:
-            A new OpenAIExecutor object with the same parameters.
+            A new OpenAIAgent object with the same parameters.
         """
-        return OpenAIExecutor(
+        return OpenAIAgent(
             client=self._llm_service.client,
             model=self._llm_service.model,
             system_message=self._system_message,
@@ -183,7 +183,7 @@ class OpenAIExecutor(BaseExecutor):
 
                 # Handle tool requests and get the final response with tool results
                 tool_response = self._tool_handler.handle_tool_request(
-                    response=response,
+                    tool_calls=response.tool_calls
                 )
 
                 yield OpenAgentResponse(
@@ -287,7 +287,7 @@ class OpenAIExecutor(BaseExecutor):
             )
             
             for chunk in response_generator:
-                if chunk.finish_reason == "tool_calls":
+                if chunk.finish_reason == "tool_calls" and chunk.tool_calls:
                     # Add the llm tool call request to the context
                     context = self.add_context(
                         {
@@ -306,15 +306,9 @@ class OpenAIExecutor(BaseExecutor):
 
                     logger.debug(f"Context: {context}") if debug else None
 
-                    notification = self._tool_handler.handle_notification(chunk)
-
-                    # If there is a tool call notification but NO CONTENT, yield the notification
-                    if notification and not chunk.content:
-                        yield notification
-
                     # Handle the tool call request and get the final response with tool results
                     tool_response = self._tool_handler.handle_tool_request(
-                        response=chunk,
+                        tool_calls=chunk.tool_calls,
                     )
 
                     yield OpenAgentStreamingResponse(

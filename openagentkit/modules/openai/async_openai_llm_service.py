@@ -6,7 +6,7 @@ from openai.types.chat.chat_completion_stream_options_param import ChatCompletio
 from openai.types.chat.chat_completion_audio_param import ChatCompletionAudioParam
 
 from pydantic import BaseModel
-from openagentkit.core.handlers.tools.tool_handler import ToolHandler
+from openagentkit.core.tools.tool_handler import ToolHandler
 from openagentkit.core.interfaces import AsyncBaseLLMModel
 from openagentkit.core.models.responses import (
     OpenAgentStreamingResponse, 
@@ -15,7 +15,7 @@ from openagentkit.core.models.responses import (
     PromptTokensDetails, 
     CompletionTokensDetails, 
 )
-from openagentkit.core.handlers.tools.tool_wrapper import Tool
+from openagentkit.core.tools.base_tool import Tool
 from openagentkit.core.models.responses.tool_response import *
 from openagentkit.core.models.responses.audio_response import AudioResponse
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
@@ -35,13 +35,14 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         top_p: Optional[float] = None,
     ) -> None:
         super().__init__(
+            model=model,
             temperature=temperature, 
             max_tokens=max_tokens, 
             top_p=top_p
         )
 
         self._tool_handler = ToolHandler(
-            tools=tools, llm_provider="openai", schema_type="OpenAI"
+            tools=tools
         )
         
         if client is None:
@@ -54,7 +55,6 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             self._client = client
 
         self._tools = tools
-        self._model = model
         self._api_key = api_key
 
     @property
@@ -96,16 +96,6 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             value: The tool handler to set.
         """
         self._tool_handler = value
-
-    @property
-    def model(self) -> str:
-        """
-        Get the model name.
-
-        Returns:
-            The model name.
-        """
-        return self._model
     
     # Property to access tools from the tool handler
     @property
@@ -201,7 +191,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                 role=response_message.role,
                 content=response_message.content,
                 tool_calls=[
-                    ToolCallResponse(
+                    ToolCall(
                         id=tool_call.id,
                         type=tool_call.type,
                         function=ToolCallFunction(
@@ -238,7 +228,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                 role=response_message.role,
                 content=response_message.content,
                 tool_calls=[
-                    ToolCallResponse(
+                    ToolCall(
                         id=tool_call.id,
                         type=tool_call.type,
                         function=ToolCallFunction(
@@ -408,7 +398,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                     role="assistant",
                     content=final_content if final_content else None,
                     finish_reason="tool_calls" if final_tool_calls else "stop",
-                    tool_calls=[ToolCallResponse(**tool_call.model_dump()) for tool_call in tool_calls],
+                    tool_calls=[ToolCall(**tool_call.model_dump()) for tool_call in tool_calls],
                     usage=UsageResponse(
                         prompt_tokens=final_chunk.usage.prompt_tokens,
                         completion_tokens=final_chunk.usage.completion_tokens,
@@ -432,7 +422,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                     role="assistant",
                     content=final_content,
                     finish_reason="tool_calls" if final_tool_calls else "stop",
-                    tool_calls=[ToolCallResponse(**tool_call.model_dump()) for tool_call in tool_calls],
+                    tool_calls=[ToolCall(**tool_call.model_dump()) for tool_call in tool_calls],
                 )
 
         
@@ -530,13 +520,6 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             audio_voice=audio_voice,
         )
         
-        if response.tool_calls:
-            # Extract tool_calls arguments using the tool handler
-            tool_calls = self._tool_handler.parse_tool_args(response)
-            
-            # Update the response with the parsed tool calls
-            response.tool_calls = tool_calls
-        
         return response
 
     async def model_stream(
@@ -601,10 +584,4 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         )
 
         async for chunk in generator:
-            if chunk.tool_calls:
-                # Extract tool_calls arguments using the tool handler
-                tool_calls = self._tool_handler.parse_tool_args(chunk)
-                
-                # Update the chunk with the parsed tool calls
-                chunk.tool_calls = tool_calls
             yield chunk

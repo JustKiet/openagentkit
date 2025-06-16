@@ -2,21 +2,7 @@ from abc import ABC, abstractmethod
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from typing import Optional, Generator, List, Dict, Any
 
-class BaseExecutor(ABC):
-    """
-    An abstract base class for executing user messages with tools and parameters.
-    This class defines the interface for executing messages and provides methods
-    for defining system messages and executing user messages with tools.
-    It is intended to be subclassed by concrete implementations that provide
-    specific execution logic.
-
-    ## Methods:
-        `define_system_message()`: An abstract method to define the system message for the executor.
-        
-        `execute()`: An abstract method to execute a user message with the given tools and parameters.
-
-        `stream_execute()`: An abstract method to stream execute a user message with the given tools and parameters.
-    """
+class BaseAgent(ABC):
     def __init__(self,
                  system_message: Optional[str] = None, 
                  context_history: Optional[List[Dict[str, Any]]] = None):
@@ -54,12 +40,12 @@ class BaseExecutor(ABC):
         self._context_history[0]["content"] = value
 
     @abstractmethod
-    def clone(self) -> 'BaseExecutor':
+    def clone(self) -> 'BaseAgent':
         """
-        An abstract method to clone the executor instance.
+        An abstract method to clone the Agent instance.
         
         Returns:
-            BaseExecutor: A clone of the executor instance.
+            BaseAgent: A clone of the Agent instance.
         """
         raise NotImplementedError
 

@@ -4,13 +4,6 @@ from openagentkit.core.models.responses.reranking_response import RerankingRespo
 from openagentkit.core.models.io.reranking import RerankingUnit
 
 class BaseRerankerModel(ABC):
-    """
-    An abstract base class for reranker models.
-
-    ## Methods:
-        `rerank()`: An abstract method to rerank a list of items based on a query.
-    """
-
     @abstractmethod
     def rerank(self, 
                query: str, 

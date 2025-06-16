@@ -3,18 +3,18 @@ import os
 from loguru import logger
 from openai._types import NOT_GIVEN
 from openai import AsyncOpenAI
-from openagentkit.core.interfaces.async_base_executor import AsyncBaseExecutor
+from openagentkit.core.interfaces.async_base_agent import AsyncBaseAgent
 from openagentkit.modules.openai.async_openai_llm_service import AsyncOpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
-from openagentkit.core.handlers.tools.tool_handler import ToolHandler
-from openagentkit.core.handlers.tools.tool_wrapper import Tool
+from openagentkit.core.tools.tool_handler import ToolHandler
+from openagentkit.core.tools.base_tool import Tool
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from pydantic import BaseModel
 from mcp import ClientSession
 
-class AsyncOpenAIExecutor(AsyncBaseExecutor):
+class AsyncOpenAIAgent(AsyncBaseAgent):
     """
-    An asynchronous executor (agentic) module for OpenAI models.
+    An asynchronous Agent (agentic) module for OpenAI models.
 
     Args:
         client (AsyncOpenAI): The AsyncOpenAI client.
@@ -28,13 +28,13 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
     Example:
     ```python
-    from openagentkit.modules.openai import AsyncOpenAIExecutor
+    from openagentkit.modules.openai import AsyncOpenAIAgent
     from openagentkit.tools import duckduckgo_search_tool
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    executor = AsyncOpenAIExecutor(client=client, tools=[duckduckgo_search_tool])
-    response = await executor.execute(messages=[{"role": "user", "content": "What is Quantum Mechanics?"}])
+    agent = AsyncOpenAIAgent(client=client, tools=[duckduckgo_search_tool])
+    response = await agent.execute(messages=[{"role": "user", "content": "What is Quantum Mechanics?"}])
     ```
 
     """
@@ -63,7 +63,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         )
         self._tools = tools
         self._tool_handler = ToolHandler(
-            tools=tools, llm_provider="openai", schema_type="OpenAI"
+            tools=tools
         )
 
     @property
@@ -87,17 +87,17 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
         return self._llm_service.tools
 
     async def connect_to_mcp(self, mcp_sessions: list[ClientSession]) -> None:
-        self._tool_handler = await ToolHandler.from_mcp(sessions=mcp_sessions, additional_tools=self._tools, llm_provider="openai")
+        self._tool_handler = await ToolHandler.from_mcp(sessions=mcp_sessions, additional_tools=self._tools)
         self._llm_service.tool_handler = self._tool_handler
     
-    def clone(self) -> 'AsyncOpenAIExecutor':
+    def clone(self) -> 'AsyncOpenAIAgent':
         """
-        Clone the AsyncOpenAIExecutor object.
+        Clone the AsyncOpenAIAgent object.
 
         Returns:
-            A new AsyncOpenAIExecutor object with the same parameters.
+            A new AsyncOpenAIAgent object with the same parameters.
         """
-        return AsyncOpenAIExecutor(
+        return AsyncOpenAIAgent(
             client=self._llm_service.client,
             model=self._llm_service.model,
             system_message=self._system_message,
@@ -140,13 +140,13 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
         Example:
         ```python
-        from openagentkit.modules.openai import AsyncOpenAIExecutor
+        from openagentkit.modules.openai import AsyncOpenAIAgent
         from openagentkit.tools import duckduckgo_search_tool
         from openai import AsyncOpenAI
         
         client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-        executor = AsyncOpenAIExecutor(client=client, tools=[duckduckgo_search_tool])
-        async for response in executor.execute(
+        Agent = AsyncOpenAIAgent(client=client, tools=[duckduckgo_search_tool])
+        async for response in Agent.execute(
             messages=[{"role": "user", "content": "What is Quantum Mechanics?"}]
         ):
             print(response)
@@ -223,7 +223,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                 # Handle tool requests abd get the final response with tool results
                 tool_response = await self._tool_handler.async_handle_tool_request(
-                    response=response,
+                    tool_calls=response.tool_calls,
                 )
 
                 yield OpenAgentResponse(
@@ -294,15 +294,15 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
         Example:
         ```python
-        from openagentkit.modules.openai import AsyncOpenAIExecutor
+        from openagentkit.modules.openai import AsyncOpenAIAgent
         from openagentkit.tools import duckduckgo_search_tool
         from openai import AsyncOpenAI
 
         client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-        executor = AsyncOpenAIExecutor(client=client, tools=[duckduckgo_search_tool])
+        Agent = AsyncOpenAIAgent(client=client, tools=[duckduckgo_search_tool])
 
-        async for chunk in executor.stream_execute(
+        async for chunk in Agent.stream_execute(
             messages=[{"role": "user", "content": "What is Quantum Mechanics?"}]
         ):
             print(chunk)
@@ -345,7 +345,7 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
             )
             
             async for chunk in response_generator:
-                if chunk.finish_reason == "tool_calls":
+                if chunk.finish_reason == "tool_calls" and chunk.tool_calls:
                     tool_calls: list[dict[str, Any]] = [tool_call.model_dump() for tool_call in chunk.tool_calls] if chunk.tool_calls else []
                     # Add the llm tool call request to the context
                     context = await self.add_context(
@@ -365,16 +365,9 @@ class AsyncOpenAIExecutor(AsyncBaseExecutor):
 
                     logger.debug(f"Context: {context}") if debug else None
 
-                    # Handle the notification (if any) from the tool call chunk
-                    notification = self._tool_handler.handle_notification(chunk)
-
-                    # If there is a tool call notification but NO CONTENT, yield the notification
-                    if notification and not chunk.content:
-                        yield notification
-
                     # Handle the tool call request and get the final response with tool results
                     tool_response = await self._tool_handler.async_handle_tool_request(
-                        response=chunk,
+                        tool_calls=chunk.tool_calls,
                     )
 
                     yield OpenAgentStreamingResponse(

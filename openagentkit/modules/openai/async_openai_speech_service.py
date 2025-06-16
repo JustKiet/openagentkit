@@ -7,7 +7,7 @@ from loguru import logger
 from openagentkit.core.utils.audio_utils import AudioUtility
 from openagentkit.modules.openai import OpenAIAudioVoices
 
-class OpenAISTTService(BaseSTTModel):
+class AsyncOpenAISTTService(BaseSTTModel):
     def __init__(
         self,
         client: OpenAI,

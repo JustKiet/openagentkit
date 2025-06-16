@@ -35,8 +35,8 @@ OpenAIAudioVoices: TypeAlias = Literal[
 ]
 
 from .openai_llm_service import OpenAILLMService # type: ignore
-from .openai_speech_service import OpenAISpeechService # type: ignore
-from .openai_executor import OpenAIExecutor # type: ignore
-from .async_openai_executor import AsyncOpenAIExecutor # type: ignore
+from .openai_speech_service import OpenAISTTService # type: ignore
+from .openai_agent import OpenAIAgent # type: ignore
+from .async_openai_agent import AsyncOpenAIAgent # type: ignore
 from .async_openai_llm_service import AsyncOpenAILLMService # type: ignore
 from .openai_embedding_service import OpenAIEmbeddingModel # type: ignore

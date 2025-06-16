@@ -1,18 +1,18 @@
-from typing import Generator
+from typing import AsyncGenerator
 from abc import ABC, abstractmethod
 
-class BaseSTTModel(ABC):
+class AsyncBaseSTTModel(ABC):
     def __init__(self,
                  model: str) -> None:
         """
-        Initializes the BaseSTTModel with a model name.
+        Initializes the AsyncBaseSTTModel with a model name.
         Args:
             model (str): The name of the speech model to use.
         """
         self.model = model
 
     @abstractmethod
-    def speech_to_text(self, audio_bytes: bytes) -> str:
+    async def speech_to_text(self, audio_bytes: bytes) -> str:
         """
         An abstract method to convert speech audio bytes to text.
 
@@ -25,7 +25,7 @@ class BaseSTTModel(ABC):
         raise NotImplementedError
     
     @abstractmethod
-    def stream_speech_to_text(self, audio_bytes: bytes) -> Generator[str, None, None]:
+    async def stream_speech_to_text(self, audio_bytes: bytes) -> AsyncGenerator[str, None]:
         """
         An abstract method to stream speech audio bytes to text.
 
@@ -33,17 +33,11 @@ class BaseSTTModel(ABC):
             audio_bytes (bytes): The audio bytes to convert to text.
 
         Returns:
-            Generator[str, None, None]: A generator that yields text transcriptions of the audio data.
+            AsyncGenerator[str, None]: A generator that yields text transcriptions of the audio data.
         """
         raise NotImplementedError
     
-class BaseTTSModel(ABC):
-    """
-    An abstract base class for text-to-speech models.
-    
-    ## Methods:
-        `text_to_speech()`: An abstract method to convert text to speech.
-    """
+class AsyncBaseTTSModel(ABC):
     def __init__(self,
                  model: str) -> None:
         """
@@ -55,7 +49,7 @@ class BaseTTSModel(ABC):
         self.model = model
 
     @abstractmethod
-    def text_to_speech(
+    async def text_to_speech(
         self, 
         text: str,
     ) -> bytes:
@@ -71,10 +65,10 @@ class BaseTTSModel(ABC):
         raise NotImplementedError
     
     @abstractmethod
-    def stream_text_to_speech(
+    async def stream_text_to_speech(
         self, 
         text: str,
-    ) -> Generator[bytes, None, None]:
+    ) -> AsyncGenerator[bytes, None]:
         """
         Stream text to speech audio bytes.
 
@@ -82,6 +76,6 @@ class BaseTTSModel(ABC):
             text (str): The text to convert to speech.
 
         Returns:
-            Generator[bytes, None, None]: A generator that yields audio bytes of the spoken text.
+            AsyncGenerator[bytes, None]: A generator that yields audio bytes of the spoken text.
         """
         raise NotImplementedError

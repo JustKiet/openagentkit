@@ -3,22 +3,7 @@ from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStrea
 from typing import Optional, AsyncGenerator, List, Dict, Any
 from mcp import ClientSession
 
-class AsyncBaseExecutor(ABC):
-    """
-    An abstract base class for executing user messages with tools and parameters.
-    This class defines the interface for executing messages and provides methods
-    for defining system messages and executing user messages with tools.
-    It is intended to be subclassed by concrete implementations that provide
-    specific execution logic.
-    
-    ## Methods:
-        `define_system_message()`: An abstract method to define the system message for the executor.
-
-        `execute()`: An abstract method to execute a user message with the given tools and parameters.
-
-        `stream_execute()`: An abstract method to stream execute a user message with the given tools and parameters.
-    """
-
+class AsyncBaseAgent(ABC):
     def __init__(self,
                  system_message: Optional[str] = None, 
                  context_history: Optional[List[Dict[str, Any]]] = None):
@@ -56,24 +41,24 @@ class AsyncBaseExecutor(ABC):
         self._context_history[0]["content"] = value
 
     @abstractmethod
-    def clone(self) -> 'AsyncBaseExecutor':
+    def clone(self) -> 'AsyncBaseAgent':
         """
-        An abstract method to clone the executor instance.
+        An abstract method to clone the Agent instance.
         
         Returns:
-            AsyncBaseExecutor: A clone of the executor instance.
+            AsyncBaseAgent: A clone of the Agent instance.
         """
-        raise NotImplementedError
+        pass
     
     @abstractmethod
     async def connect_to_mcp(self, mcp_sessions: List[ClientSession]) -> None:
         """
-        An abstract method to connect the executor to the MCP sessions.
+        An abstract method to connect the Agent to the MCP sessions.
         
         Args:
             sessions (List[Dict[str, Any]]): The sessions to be connected.
         """
-        raise NotImplementedError
+        pass
 
     @abstractmethod
     async def execute(self,
@@ -97,11 +82,11 @@ class AsyncBaseExecutor(ABC):
             top_p (Optional[float]): The top-p sampling parameter.
 
         Returns:
-            OpenAgentResponse: The response from the executor.
+            OpenAgentResponse: The response from the Agent.
         """
-        if False:
+        while False:
             yield
-        raise NotImplementedError
+        pass
     
     @abstractmethod
     async def stream_execute(self,
@@ -127,9 +112,9 @@ class AsyncBaseExecutor(ABC):
         Returns:
             AsyncGenerator[OpenAgentStreamingResponse, None]: The streamed response.
         """
-        if False:
+        while False:
             yield
-        raise NotImplementedError
+        pass
     
     async def get_history(self) -> List[Dict[str, Any]]:
         """
