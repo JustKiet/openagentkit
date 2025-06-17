@@ -3,6 +3,34 @@ from typing import Callable, Any, Optional, Dict, TypeVar, overload, Union
 from pydantic import create_model
 import inspect
 
+def build_tool_schema(
+    func: Callable[..., Any], 
+    name: str,
+    description: str = ""
+) -> Dict[str, Any]:
+    signature = inspect.signature(func)
+    final_description = inspect.getdoc(func) or description
+
+    model_fields = {
+        name: (param.annotation, ...)
+        for name, param in signature.parameters.items()
+    }
+
+    ToolArguments = create_model("ToolArguments", **model_fields) # type: ignore
+    raw_schema = ToolArguments.model_json_schema() # type: ignore
+    raw_schema.pop("title", None) # type: ignore
+    raw_schema["additionalProperties"] = False
+
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": final_description,
+            "strict": True,
+            "parameters": raw_schema,
+        },
+    }
+
 # --------------------------------
 # Tool implementation
 # --------------------------------
@@ -14,13 +42,34 @@ class Tool:
 
     def __init__(
         self,
+        func: Optional[Callable[..., Any]] = None,
+        *,
+        schema: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        if func is None:
+            func = self.__call__
+
+        self._func = func
+
+        if schema is None:
+            schema = build_tool_schema(self._func, name=str(self.__class__.__name__))
+        
+        self.schema = schema
+        update_wrapper(self, self._func)
+
+    @classmethod
+    def from_decorator(
+        cls,
         func: Callable[..., Any],
         *,
         schema: Dict[str, Any],
-    ):
-        self._func = func
-        self.schema = schema
-        update_wrapper(self, func)
+    ) -> "Tool":
+        """ 
+        Create a Tool instance from a function and a schema.
+        This is used internally by the `tool` decorator.
+        """
+        tool_instance = cls(func, schema=schema)
+        return tool_instance
 
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         if inspect.iscoroutinefunction(self._func):
@@ -81,7 +130,7 @@ def tool(
             },
         }
 
-        return Tool(inner_func, schema=schema)
+        return Tool.from_decorator(inner_func, schema=schema)
 
     # If used without args: @tool
     return decorator if func is None else decorator(func)

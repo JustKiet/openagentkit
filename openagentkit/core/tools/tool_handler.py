@@ -3,6 +3,7 @@ import json
 from openagentkit.core.exceptions import InvalidToolSchemaError
 from openagentkit.core.models.responses import ToolResponse, ToolCallResult, ToolCallMessage, ToolCall, ToolCallFunction
 from openagentkit.core.tools.base_tool import Tool
+from openagentkit.core.tools.tool_utils import args_cleaner
 from mcp import ClientSession
 from mcp.types import CallToolResult
 import inspect
@@ -181,6 +182,7 @@ class ToolHandler:
             tool_args = tool_call.function.arguments
             if isinstance(tool_args, str):
                 try:
+                    tool_args = args_cleaner(tool_args)
                     tool_args = json.loads(tool_args)
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse tool arguments for {tool_name}: {e}")
@@ -230,6 +232,7 @@ class ToolHandler:
             tool_args = tool_call.function.arguments
             if isinstance(tool_args, str):
                 try:
+                    tool_args = args_cleaner(tool_args)
                     tool_args = json.loads(tool_args)
                 except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse tool arguments for {tool_name}: {e}")
