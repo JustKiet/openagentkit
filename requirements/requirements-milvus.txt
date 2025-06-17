@@ -4,7 +4,6 @@
 #
 #    pip-compile --output-file=requirements/requirements-milvus.txt requirements/requirements-milvus.in
 #
---index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 grpcio==1.67.1
     # via pymilvus

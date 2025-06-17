@@ -4,7 +4,6 @@
 #
 #    pip-compile --output-file=requirements/requirements-core.txt requirements/requirements-core.in
 #
---index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 loguru==0.7.3
     # via -r requirements/requirements-core.in

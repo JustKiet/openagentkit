@@ -1,20 +1,22 @@
+import os
 from setuptools import setup, find_packages
 from itertools import chain
 
-with open('requirements/requirements-core.txt') as f:
-    requirements_core = f.read().splitlines()
+here = os.path.abspath(os.path.dirname(__file__))
 
-with open('requirements/requirements-mcp.txt') as f:
-    requirements_mcp = f.read().splitlines()
+def load_requirements(filename: str):
+    with open(os.path.join(here, 'requirements', filename)) as f:
+        return [
+            line.strip()
+            for line in f
+            if line.strip() and not line.startswith('#')
+        ]
 
-with open('requirements/requirements-openai.txt') as f:
-    requirements_openai = f.read().splitlines()
-
-with open('requirements/requirements-milvus.txt') as f:
-    requirements_milvus = f.read().splitlines()
-
-with open('requirements/requirements-voyageai.txt') as f:
-    requirements_voyageai = f.read().splitlines()
+requirements_core = load_requirements("requirements-core.txt")
+requirements_mcp = load_requirements("requirements-mcp.txt")
+requirements_openai = load_requirements("requirements-openai.txt")
+requirements_milvus = load_requirements("requirements-milvus.txt")
+requirements_voyageai = load_requirements("requirements-voyageai.txt")
 
 with open('README.md', encoding='utf-8') as f:
     long_description = f.read()
@@ -29,7 +31,7 @@ requirements_all = sorted(set(chain(
 
 setup(
     name='openagentkit',
-    version='0.1.0.dev19',
+    version='0.1.0-alpha.1',
     packages=find_packages(),
     install_requires=requirements_core,
     extras_require={

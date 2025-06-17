@@ -4,7 +4,6 @@
 #
 #    pip-compile --output-file=requirements/requirements-voyageai.txt requirements/requirements-voyageai.in
 #
---index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 aiohappyeyeballs==2.6.1
     # via aiohttp

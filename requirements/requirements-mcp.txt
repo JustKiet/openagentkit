@@ -4,7 +4,6 @@
 #
 #    pip-compile --output-file=requirements/requirements-mcp.txt requirements/requirements-mcp.in
 #
---index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 annotated-types==0.7.0
     # via pydantic
