@@ -4,7 +4,6 @@
 #
 #    pip-compile --output-file=requirements/requirements-dev.txt requirements/requirements-dev.in
 #
---index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 build==1.2.2.post1
     # via pip-tools
