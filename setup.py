@@ -31,7 +31,7 @@ requirements_all = sorted(set(chain(
 
 setup(
     name='openagentkit',
-    version='0.1.0-alpha.2',
+    version='0.1.0-alpha.3',
     packages=find_packages(),
     install_requires=requirements_core,
     extras_require={
