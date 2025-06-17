@@ -4,29 +4,23 @@ from pydantic import BaseModel
 from typing import Union, Optional, Generator, List, Dict, Any
 
 class BaseLLMModel(ABC):
-    """
-    An abstract base class for LLM models.
-    
-    ## Methods:
-        `model_generate()`: An abstract method to generate a response from the LLM model.
-
-        `model_stream()`: An abstract method to stream a response from the LLM model.
-
-    ## Properties:
-        `temperature`: A property to get and set the temperature for the response generation. (defaults to be the range of 0 to 2)
-
-        `max_tokens`: A property to get and set the maximum number of tokens for the response. (defaults to be None)
-
-        `top_p`: A property to get and set the top-p sampling parameter.
-    """
     def __init__(self,
+                 model: str,
                  temperature: Optional[float] = None,
                  max_tokens: Optional[int] = None,
                  top_p: Optional[float] = None,
                  ) -> None:
+        self._model = model
         self._temperature = temperature if temperature is not None else 1.0
         self._max_tokens = max_tokens
         self._top_p = top_p
+
+    @property
+    def model(self) -> str:
+        """
+        A property to get the model name.
+        """
+        return self._model
 
     @property
     def temperature(self) -> float:

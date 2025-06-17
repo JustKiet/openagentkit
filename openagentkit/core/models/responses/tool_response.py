@@ -12,16 +12,15 @@ class ToolCallMessage(BaseModel):
 
 class ToolCallFunction(BaseModel):
     name: str
-    arguments: str
+    arguments: str | dict[str, Any]
 
-class ToolCallResponse(BaseModel):
+class ToolCall(BaseModel):
     id: str
     type: str
     function: ToolCallFunction
 
 class ToolResponse(BaseModel):
     tool_args: Optional[list[dict[str, Any]]] = None
-    tool_calls: Optional[list[ToolCallResponse]] = None
+    tool_calls: Optional[list[ToolCall]] = None
     tool_results: Optional[list[ToolCallResult]] = None
     tool_messages: Optional[list[ToolCallMessage]] = None
-    tool_notifications: Optional[list[str]] = None

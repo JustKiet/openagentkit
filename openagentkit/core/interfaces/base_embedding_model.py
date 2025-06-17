@@ -5,14 +5,6 @@ from typing import Union, TypeVar, Generic
 T = TypeVar("T", int, str)
 
 class BaseEmbeddingModel(ABC, Generic[T]):
-    """
-    An abstract base class for embedding models.
-
-    ## Methods:
-        `encode_texts()`: An abstract method to encode texts into embeddings.
-
-        `tokenize_texts()`: An abstract method to tokenize texts.
-    """
     @abstractmethod
     def encode_query(self, query: str, include_metadata: bool = False) -> Union[EmbeddingUnit, EmbeddingResponse]:
         """
