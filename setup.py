@@ -13,7 +13,6 @@ def load_requirements(filename: str):
         ]
 
 requirements_core = load_requirements("requirements-core.txt")
-requirements_mcp = load_requirements("requirements-mcp.txt")
 requirements_openai = load_requirements("requirements-openai.txt")
 requirements_milvus = load_requirements("requirements-milvus.txt")
 requirements_voyageai = load_requirements("requirements-voyageai.txt")
@@ -23,7 +22,6 @@ with open('README.md', encoding='utf-8') as f:
 
 requirements_all = sorted(set(chain(
     requirements_core,
-    requirements_mcp,
     requirements_openai,
     requirements_milvus,
     requirements_voyageai
@@ -35,7 +33,6 @@ setup(
     packages=find_packages(),
     install_requires=requirements_core,
     extras_require={
-        'mcp': requirements_mcp,
         'openai': requirements_openai,
         'milvus': requirements_milvus,
         'voyageai': requirements_voyageai,

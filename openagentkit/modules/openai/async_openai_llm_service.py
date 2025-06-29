@@ -456,7 +456,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         
     async def model_generate(
         self, 
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         response_schema: Optional[type[BaseModel]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,

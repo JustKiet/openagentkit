@@ -1,7 +1,7 @@
 from pydantic import BaseModel
-from typing import Literal, Optional, List, Union, Dict, Any
+from typing import Literal, Optional, List
 from openagentkit.core.models.responses.usage_responses import UsageResponse
-from openagentkit.core.models.responses.tool_response import ToolCall
+from openagentkit.core.models.responses.tool_response import ToolCall, ToolCallResult
 
 class OpenAgentStreamingResponse(BaseModel):
     """
@@ -14,7 +14,7 @@ class OpenAgentStreamingResponse(BaseModel):
             index: Optional[int] = None
             delta_content: Optional[str] = None
             delta_audio: Optional[str] = None
-            tool_calls: Optional[List[Union[Dict[str, Any], BaseModel]]] = None
+            tool_calls: Optional[List[ToolCallResult]] = None
             tool_notification: Optional[str] = None
             content: Optional[str] = None
             finish_reason: Optional[Literal["stop", "length", "tool_calls", "tool_results", "content_filter", "function_call", "transcription"]] = None
@@ -36,7 +36,7 @@ class OpenAgentStreamingResponse(BaseModel):
     delta_content: Optional[str] = None
     delta_audio: Optional[str] = None
     tool_calls: Optional[List[ToolCall]] = None
-    tool_results: Optional[List[Union[Dict[str, Any], BaseModel, Any]]] = None
+    tool_results: Optional[List[ToolCallResult]] = None
     tool_notification: Optional[str] = None
     content: Optional[str] = None
     finish_reason: Optional[Literal["stop", "length", "tool_calls", "tool_results", "content_filter", "function_call", "transcription"]] = None

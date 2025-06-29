@@ -1,2 +1,5 @@
 loguru
 scipy
+pydantic
+mcp[cli]
+httpx

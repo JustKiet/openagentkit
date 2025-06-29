@@ -2,7 +2,8 @@ from typing import Any, Dict, List, Optional, Generator
 import os
 import logging
 from openai import OpenAI
-from openagentkit.core.interfaces.base_agent import BaseAgent
+from openagentkit.core.interfaces import BaseAgent, BaseContextStore
+from openagentkit.core.context import InMemoryContextStore
 from openagentkit.modules.openai import OpenAILLMService
 from openagentkit.core.models.responses import OpenAgentResponse, OpenAgentStreamingResponse
 from openagentkit.core.tools.tool_handler import ToolHandler
@@ -19,15 +20,13 @@ class OpenAIAgent(BaseAgent):
         model: str = "gpt-4o-mini",
         system_message: Optional[str] = None,
         tools: Optional[List[Tool]] = None,
+        context_store: Optional[BaseContextStore] = None,
         api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
         temperature: Optional[float] = 0.3,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
         **kwargs: Any
     ) -> None:
-        context_history = kwargs.get("context_history", None)
-        super().__init__(system_message=system_message, context_history=context_history)
-
         self._llm_service = OpenAILLMService(
             client=client,
             model=model,
@@ -44,6 +43,18 @@ class OpenAIAgent(BaseAgent):
 
         self._tools = tools
 
+        self._system_message = system_message or "You are a helpful assistant."
+        
+        context_history = kwargs.get("context_history", None)
+
+        if context_store:
+            self.context_store = context_store
+        else:
+            self.context_store = InMemoryContextStore(
+                system_message=self._system_message,
+                context_history=context_history
+            )
+        
     @property
     def model(self) -> str:
         return self._llm_service.model
@@ -128,7 +139,7 @@ class OpenAIAgent(BaseAgent):
         if not tools:
             tools = self._llm_service.tools
         
-        context = self.extend_context(messages)
+        context = self.context_store.extend_context(messages)
         
         logger.debug(f"Context: {context}") if debug else None
 
@@ -152,7 +163,7 @@ class OpenAIAgent(BaseAgent):
             
             if response.content is not None:
                 # Add the response to the context (chat history)
-                context = self.add_context(
+                context = self.context_store.add_context(
                     {
                         "role": response.role,
                         "content": str(response.content),
@@ -165,7 +176,7 @@ class OpenAIAgent(BaseAgent):
                 # Add the tool call request to the context
                 tool_calls: list[dict[str, str]] = [tool_call.model_dump() for tool_call in response.tool_calls]
 
-                context = self.add_context(
+                context = self.context_store.add_context(
                     {
                         "role": response.role,
                         "tool_calls": tool_calls,
@@ -193,7 +204,7 @@ class OpenAIAgent(BaseAgent):
 
                 logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
 
-                context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
+                context = self.context_store.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
 
                 logger.debug(f"Context: {context}") if debug else None
             else:
@@ -270,7 +281,7 @@ class OpenAIAgent(BaseAgent):
 
         stop = False
 
-        context: list[dict[str, Any]] = self.extend_context(messages)
+        context: list[dict[str, Any]] = self.context_store.extend_context(messages)
 
         while not stop:
 
@@ -291,7 +302,7 @@ class OpenAIAgent(BaseAgent):
             for chunk in response_generator:
                 if chunk.finish_reason == "tool_calls" and chunk.tool_calls:
                     # Add the llm tool call request to the context
-                    context = self.add_context(
+                    context = self.context_store.add_context(
                         {
                             "role": "assistant",
                             "tool_calls": chunk.tool_calls,
@@ -320,13 +331,13 @@ class OpenAIAgent(BaseAgent):
 
                     logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
                     
-                    context = self.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
+                    context = self.context_store.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
                     
                     logger.debug(f"Context in Stream Execute: {context}") if debug else None
 
                 elif chunk.finish_reason == "stop":
                     if chunk.content:
-                        context = self.add_context(
+                        context = self.context_store.add_context(
                             {
                                 "role": "assistant", 
                                 "content": str(chunk.content),
