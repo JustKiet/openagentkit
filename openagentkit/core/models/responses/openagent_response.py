@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from openagentkit.core.models.responses.usage_responses import UsageResponse
 from openagentkit.core.models.responses.tool_response import ToolCall
 from openagentkit.core.models.responses.audio_response import AudioResponse
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, Any, Union
 
 class OpenAgentResponse(BaseModel):
     """
@@ -14,7 +14,7 @@ class OpenAgentResponse(BaseModel):
         role: str
         content: Optional[Union[str, BaseModel, dict]] = None
         tool_calls: Optional[List[ToolCall] = None
-        tool_results: Optional[List[Union[Dict[str, Any], BaseModel]]] = None
+        tool_results: Optional[List[Any]] = None
         refusal: Optional[str] = None
         audio: Optional[AudioResponse] = None
         usage: Optional[UsageResponse] = None
@@ -29,9 +29,9 @@ class OpenAgentResponse(BaseModel):
         - `usage`: The usage of the response.
     """
     role: str
-    content: Optional[Union[str, BaseModel, dict[str, str], Any]] = None
-    tool_calls: Optional[List[ToolCall]] = None
-    tool_results: Optional[List[Union[Dict[str, Any], BaseModel, Any]]] = None
+    content: Optional[Union[str, BaseModel, dict[str, str]]] = None
+    tool_calls: Optional[list[ToolCall]] = None
+    tool_results: Optional[list[Any]] = None
     refusal: Optional[str] = None
     audio: Optional[AudioResponse] = None
     usage: Optional[UsageResponse] = None

@@ -22,6 +22,7 @@ from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from typing import Generator
 import os
 from loguru import logger
+import json
 
 class OpenAILLMService(BaseLLMModel):
     def __init__(
@@ -174,7 +175,7 @@ class OpenAILLMService(BaseLLMModel):
             client_response = self._client.chat.completions.create(
                 model=self._model,
                 messages=messages, # type: ignore
-                tools=tools, # type: ignore
+                tools=tools if tools else NOT_GIVEN, # type: ignore
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
@@ -224,10 +225,12 @@ class OpenAILLMService(BaseLLMModel):
 
             response_message = client_response.choices[0].message
 
+            parsed_content = response_schema(**json.loads(response_message.content)) if response_message.content else None
+
             # Create the response object
             response = OpenAgentResponse(
                 role=response_message.role,
-                content=response_message.content,
+                content=parsed_content,
                 tool_calls=[
                     ToolCall(
                         id=tool_call.id,

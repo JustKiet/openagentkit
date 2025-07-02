@@ -22,6 +22,7 @@ from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from typing import AsyncGenerator
 import os
 import logging
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +178,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             client_response = await self._client.chat.completions.create(
                 model=self._model,
                 messages=messages, # type: ignore
-                tools=tools if tools is not None else NOT_GIVEN, # type: ignore
+                tools=tools if tools else NOT_GIVEN, # type: ignore
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
@@ -218,7 +219,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             client_response = await self._client.beta.chat.completions.parse(
                 model=self._model,
                 messages=messages, # type: ignore
-                tools=tools, # type: ignore
+                tools=tools if tools else NOT_GIVEN, # type: ignore
                 response_format=response_schema, # type: ignore
                 temperature=temperature,
                 max_tokens=max_tokens,
@@ -227,10 +228,12 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
 
             response_message = client_response.choices[0].message
 
+            parsed_content = response_schema(**json.loads(response_message.content)) if response_message.content else None
+
             # Create the response object
             response = OpenAgentResponse(
                 role=response_message.role,
-                content=response_message.content,
+                content=parsed_content,
                 tool_calls=[
                     ToolCall(
                         id=tool_call.id,

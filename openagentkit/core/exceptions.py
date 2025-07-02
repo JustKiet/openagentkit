@@ -31,3 +31,8 @@ class ToolCallError(Exception):
     """Exception raised for errors during tool calls."""
     def __init__(self, message: str):
         super().__init__(message)
+
+class OperationNotAllowedError(Exception):
+    """Exception raised when an operation is not allowed."""
+    def __init__(self, message: str):
+        super().__init__(message)

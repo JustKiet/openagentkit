@@ -1,82 +1,87 @@
+from openagentkit.core.models.io.context_unit import ContextUnit
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Optional
 
 class BaseContextStore(ABC):
     @abstractmethod
-    def get_system_message(self, context_id: str) -> str:
+    def get_system_message(self, thread_id: str) -> str:
         """
-        Get the system message for the given context ID.
+        Get the system message for the given thread ID.
 
-        :param str context_id: The ID of the context.
+        :param str thread_id: The ID of the context.
         :return: The system message, or an empty string if not found.
         :rtype: str
         """
         pass
     
     @abstractmethod
-    def update_system_message(self, context_id: str, system_message: str) -> None:
+    def update_system_message(self, thread_id: str, agent_id: str, system_message: str) -> None:
         """
-        Update the system message for the given context ID.
+        Update the system message for the given thread ID.
 
-        :param str context_id: The ID of the context to update.
+        :param str thread_id: The ID of the context to update.
+        :param str agent_id: The ID of the agent associated with the context.
         :param str system_message: The new system message to set.
         """
         pass
 
     @abstractmethod
-    def init_context(self, context_id: str, system_message: str) -> list[dict[str, Any]]:
+    def init_context(self, thread_id: str, agent_id: str, system_message: str) -> ContextUnit:
         """
-        Initialize the context for the given context ID.
+        Initialize the context for the given thread ID.
 
-        :param str context_id: The ID of the context to initialize.
+        :param str thread_id: The ID of the context to initialize.
+        :param str agent_id: The ID of the agent associated with the context.
         :param str system_message: The system message to set for the context.
         :return: The initialized context, which includes the system message.
-        :rtype: list[dict[str, Any]]
+        :rtype: ContextUnit
         """
         pass
     
     @abstractmethod
-    def get_context(self, context_id: str) -> list[dict[str, Any]]:
+    def get_context(self, thread_id: str) -> Optional[ContextUnit]:
         """
         An abstract method to get the history of the conversation.
 
-        :param str context_id: The ID of the context to retrieve.
+        :param str thread_id: The ID of the context to retrieve.
         :return: The context history.
-        :rtype: list[dict[str, Any]]
+        :rtype: Optional[ContextUnit]
         """
         pass
     
     @abstractmethod
-    def add_context(self, context_id: str, content: dict[str, Any]) -> list[dict[str, Any]]:
+    def add_context(self, thread_id: str, agent_id: str, content: dict[str, Any]) -> ContextUnit:
         """
         Add context to the model.
 
-        :param str context_id: The ID of the context to add content to.
+        :param str thread_id: The ID of the context to add content to.
+        :param str agent_id: The ID of the agent associated with the context.
         :param dict[str, Any] content: The content to add to the context.
         :return: The updated context history.
-        :rtype: list[dict[str, Any]]
+        :rtype: ContextUnit
         """
         pass
     
     @abstractmethod
-    def extend_context(self, context_id: str, content: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def extend_context(self, thread_id: str, agent_id: str, content: list[dict[str, Any]]) -> ContextUnit:
         """
         Extend the context of the model.
 
-        :param str context_id: The ID of the context to extend.
+        :param str thread_id: The ID of the context to extend.
+        :param str agent_id: The ID of the agent associated with the context.
         :param list[dict[str, Any]] content: The list of content to extend the context with.
         :return: The updated context history.
-        :rtype: list[dict[str, Any]]
+        :rtype: ContextUnit
         """
         pass
     
     @abstractmethod
-    def clear_context(self, context_id: str) -> list[dict[str, Any]]:
+    def clear_context(self, thread_id: str) -> Optional[ContextUnit]:
         """
         Clear the context of the model leaving only the system message.
 
-        :param str context_id: The ID of the context to clear.
+        :param str thread_id: The ID of the context to clear.
         :return: The updated context history.
-        :rtype: list[dict[str, Any]]
+        :rtype: Optional[ContextUnit]
         """
         pass

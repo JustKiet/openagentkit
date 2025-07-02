@@ -1,101 +1,166 @@
 from openagentkit.core.interfaces.base_context_store import BaseContextStore
-from typing import Any
+from openagentkit.core.models.io.context_unit import ContextUnit
+from openagentkit.core.exceptions import OperationNotAllowedError
+from datetime import datetime
+from typing import Any, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 class InMemoryContextStore(BaseContextStore):
     def __init__(self) -> None:
-        self._context_store: dict[str, list[dict[str, Any]]] = {}
+        self._storage: dict[str, ContextUnit] = {}
 
-    def get_system_message(self, context_id: str) -> str:
+    @property
+    def storage(self) -> dict[str, ContextUnit]:
         """
-        Get the system message for the given context ID.
+        Get the context store.
 
-        :param str context_id: The ID of the context.
+        :return: The context store as a dictionary.
+        :rtype: dict[str, ContextUnit]
+        """
+        return self._storage
+
+    def get_system_message(self, thread_id: str) -> str:
+        """
+        Get the system message for the given thread ID.
+
+        :param str thread_id: The ID of the context.
         :return: The system message, or an empty string if not found.
         :rtype: str
         """
-        context = self._context_store.get(context_id, [])
-        
-        for item in context:
-            if item.get("role") == "system":
-                return item.get("content", "")
-    
+        context = self._storage.get(thread_id, None)
+        if context:
+            for message in context.history:
+                if message['role'] == 'system':
+                    return message['content']
+        # If no system message is found, return an empty string
         return ""
-    
-    def update_system_message(self, context_id: str, system_message: str) -> None:
-        self._context_store.setdefault(context_id, [])
-        context = self._context_store[context_id]
-        # Check if a system message already exists
-        for item in context:
-            if item.get("role") == "system":
-                item["content"] = system_message
-                return
 
-    def init_context(self, context_id: str, system_message: str) -> list[dict[str, Any]]:
+    def update_system_message(self, thread_id: str, agent_id: str, system_message: str) -> None:
+        context = self._storage.get(thread_id, None)
+        if context is None:
+            context = self.init_context(thread_id, agent_id, system_message)
+        else:
+            if context.agent_id != agent_id:
+                raise OperationNotAllowedError(f"Thread ID {thread_id} belongs to a different agent: {context.agent_id}, the provided agent ID is {agent_id}.")
+            
+            # Update the system message in the existing context
+            for message in context.history:
+                if message['role'] == 'system':
+                    message['content'] = system_message
+                    break
+            else:
+                # If no system message exists, add a new one at the beginning of the history
+                context.history.insert(0, {"role": "system", "content": system_message})
+        context.updated_at = int(datetime.now().timestamp())
+
+    def init_context(
+        self, 
+        thread_id: str, 
+        agent_id: str,
+        system_message: str
+    ) -> ContextUnit:
         """
-        Initialize the context for the given context ID.
+        Initialize the context for the given thread ID.
 
-        :param str context_id: The ID of the context to initialize.
+        :param str thread_id: The ID of the context to initialize.
+        :param str agent_id: The ID of the agent associated with the context.
         :param str system_message: The system message to set for the context.
         :return: The initialized context, which includes the system message.
-        :rtype: list[dict[str, Any]]
+        :rtype: ContextUnit
         """
-        if context_id not in self._context_store:
-            self._context_store[context_id] = []
-            # Add a default system message if needed
-            self._context_store[context_id].append({"role": "system", "content": system_message})
-        return self._context_store[context_id]
-
-    def get_context(self, context_id: str) -> list[dict[str, Any]]:
-        """
-        Get the context for the given context ID.
-
-        :param str context_id: The ID of the context.
-        :return: The context as a list of message dictionaries.
-        :rtype: list[dict[str, Any]]
-        """
-        return self._context_store.get(context_id, [])
+        if thread_id not in self._storage:
+            self._storage[thread_id] = ContextUnit(
+                thread_id=thread_id,
+                agent_id=agent_id,
+                history=[{"role": "system", "content": system_message}],
+                created_at=int(datetime.now().timestamp()),
+                updated_at=int(datetime.now().timestamp())
+            )
+        else:
+            raise OperationNotAllowedError(f"Context with thread ID {thread_id} already exists.")
         
+        return self._storage[thread_id]
 
-    def add_context(self, context_id: str, content: dict[str, Any]) -> list[dict[str, Any]]:
+    def get_context(self, thread_id: str) -> Optional[ContextUnit]:
+        """
+        Get the context for the given thread ID.
+
+        :param str thread_id: The ID of the context.
+        :return: The context as a ContextUnit.
+        :rtype: Optional[ContextUnit]
+        """
+        return self._storage.get(thread_id, None)
+
+    def add_context(self, thread_id: str, agent_id: str, content: dict[str, Any]) -> ContextUnit:
         """
         Add context to the model.
 
-        :param str context_id: The ID of the context to add content to.
+        :param str thread_id: The ID of the context to add content to.
+        :param str agent_id: The ID of the agent associated with the context.
         :param dict[str, Any] content: The content to add to the context.
         :return: The updated context history.
         :rtype: list[dict[str, Any]]
         """
-        if context_id not in self._context_store:
-            self._context_store[context_id] = []
-        
-        self._context_store[context_id].append(content)
-        return self._context_store[context_id]
+        if thread_id not in self._storage:
+            self._storage[thread_id] = ContextUnit(
+                thread_id=thread_id,
+                agent_id=agent_id,
+                created_at=int(datetime.now().timestamp()),
+                updated_at=int(datetime.now().timestamp())
+            )
 
-    def extend_context(self, context_id: str, content: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        if self._storage[thread_id].agent_id != agent_id:
+            raise OperationNotAllowedError(f"Thread ID {thread_id} belongs to a different agent: {self._storage[thread_id].agent_id}, the provided agent ID is {agent_id}.")
+        
+        self._storage[thread_id].history.append(content)
+        self._storage[thread_id].updated_at = int(datetime.now().timestamp())
+        return self._storage[thread_id]
+
+    def extend_context(self, thread_id: str, agent_id: str, content: list[dict[str, Any]]) -> ContextUnit:
         """
         Extend the context of the model.
 
-        :param str context_id: The ID of the context to extend.
+        :param str thread_id: The ID of the context to extend.
+        :param str agent_id: The ID of the agent associated with the context.
         :param list[dict[str, Any]] content: The list of content to extend the context with.
         :return: The updated context history.
-        :rtype: list[dict[str, Any]]
+        :rtype: ContextUnit
         """
-        if context_id not in self._context_store:
-            self._context_store[context_id] = []
+        if thread_id not in self._storage:
+            self._storage[thread_id] = ContextUnit(
+                thread_id=thread_id,
+                agent_id=agent_id,
+                created_at=int(datetime.now().timestamp()),
+                updated_at=int(datetime.now().timestamp())
+            )
         
-        self._context_store[context_id].extend(content)
-        return self._context_store[context_id]
+        if self._storage[thread_id].agent_id != agent_id:
+            raise OperationNotAllowedError(f"Thread ID {thread_id} belongs to a different agent: {self._storage[thread_id].agent_id}, the provided agent ID is {agent_id}.")
 
-    def clear_context(self, context_id: str) -> list[dict[str, Any]]:
+        self._storage[thread_id].history.extend(content)
+        self._storage[thread_id].updated_at = int(datetime.now().timestamp())
+        return self._storage[thread_id]
+
+    def clear_context(self, thread_id: str) -> Optional[ContextUnit]:
         """
         Clear the context of the model leaving only the system message.
 
-        :param str context_id: The ID of the context to clear.
-        :return: The updated context history.
-        :rtype: list[dict[str, Any]]
+        :param str thread_id: The ID of the context to clear.
+        :return: The cleared context with only the system message.
+        :rtype: Optional[ContextUnit]
         """
-        if context_id in self._context_store:
-            system_message = self.get_system_message(context_id)
-            self._context_store[context_id] = [{"role": "system", "content": system_message}]
-        
-        return self._context_store[context_id]
+        if thread_id in self._storage:
+            system_message = self.get_system_message(thread_id)
+            self._storage[thread_id] = ContextUnit(
+                thread_id=thread_id,
+                agent_id=self._storage[thread_id].agent_id,
+                history=[{"role": "system", "content": system_message}],
+                created_at=int(datetime.now().timestamp()),
+                updated_at=int(datetime.now().timestamp())
+            )
+        else:
+            logger.warning(f"Attempted to clear context for non-existent thread ID: {thread_id}")
+            return None
+        return self._storage[thread_id]

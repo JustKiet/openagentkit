@@ -10,6 +10,7 @@ from openagentkit.core.tools.tool_handler import ToolHandler
 from openagentkit.core.tools.base_tool import Tool
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from pydantic import BaseModel
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +23,9 @@ class OpenAIAgent(BaseAgent):
         tools: Optional[List[Tool]] = None,
         context_store: Optional[BaseContextStore] = None,
         api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-        temperature: Optional[float] = 0.3,
+        temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
-        **kwargs: Any
     ) -> None:
         self._llm_service = OpenAILLMService(
             client=client,
@@ -36,24 +36,42 @@ class OpenAIAgent(BaseAgent):
             max_tokens=max_tokens,
             top_p=top_p,
         )
-
+        self._tools = tools
         self._tool_handler = ToolHandler(
             tools=tools
         )
+        
+        if not context_store:
+            context_store = InMemoryContextStore()
+        
+        self.context_store: BaseContextStore = context_store 
 
-        self._tools = tools
+        self._thread_id = str(uuid.uuid4())
+        self._agent_id = str(uuid.uuid4())
 
         self._system_message = system_message or "You are a helpful assistant."
-        
-        context_history = kwargs.get("context_history", None)
 
-        if context_store:
-            self.context_store = context_store
-        else:
-            self.context_store = InMemoryContextStore(
-                system_message=self._system_message,
-                context_history=context_history
-            )
+        self.context_store.init_context(
+            thread_id=self._thread_id,
+            agent_id=self._agent_id,
+            system_message=self._system_message,
+        )
+
+    @property
+    def system_message(self) -> str:
+        return self._system_message
+
+    def update_system_message(self, system_message: str, thread_id: str) -> None:
+        """
+        Set the system message for the agent.
+
+        :param str system_message: The system message to set.
+        """
+        self.context_store.update_system_message(
+            thread_id=thread_id,
+            agent_id=self._agent_id,
+            system_message=system_message,
+        )
         
     @property
     def model(self) -> str:
@@ -74,6 +92,16 @@ class OpenAIAgent(BaseAgent):
     @property
     def tools(self) -> List[Dict[str, Any]] | None:
         return self._llm_service.tools
+    
+    @property
+    def thread_id(self) -> str:
+        """
+        Get the thread ID for the agent.
+
+        Returns:
+            The thread ID.
+        """
+        return self._thread_id
     
     def clone(self) -> 'OpenAIAgent':
         """
@@ -122,26 +150,28 @@ class OpenAIAgent(BaseAgent):
         :return: An OpenAgentResponse generator.
         :rtype: Generator[OpenAgentResponse, None, None]
         """
-        temperature = kwargs.get("temperature", temperature)
-        if temperature is None:
-            temperature = self.temperature
-
-        max_tokens = kwargs.get("max_tokens", max_tokens)
-        if max_tokens is None:
-            max_tokens = self.max_tokens
-
-        top_p = kwargs.get("top_p", top_p)
-        if top_p is None:
-            top_p = self.top_p
-
-        debug = kwargs.get("debug", False)
+        temperature = kwargs.get("temperature", self.temperature)
+        max_tokens = kwargs.get("max_tokens", self.max_tokens)
+        top_p = kwargs.get("top_p", self.top_p)
+        thread_id = kwargs.get("thread_id", self._thread_id)
         
         if not tools:
             tools = self._llm_service.tools
         
-        context = self.context_store.extend_context(messages)
+        if thread_id != self._thread_id:
+            self.context_store.init_context(
+                thread_id=thread_id,
+                agent_id=self._agent_id,
+                system_message=self._system_message,
+            )
+
+        context: list[dict[str, Any]] = self.context_store.extend_context(
+            thread_id=thread_id,
+            agent_id=self._agent_id,
+            content=messages
+        ).history
         
-        logger.debug(f"Context: {context}") if debug else None
+        logger.debug(f"Context: {context}")
 
         stop = False
 
@@ -159,16 +189,18 @@ class OpenAIAgent(BaseAgent):
                 audio_voice=audio_voice,
             )
 
-            logger.info(f"Response Received: {response}") if debug else None
+            logger.info(f"Response Received: {response}")
             
             if response.content is not None:
                 # Add the response to the context (chat history)
                 context = self.context_store.add_context(
-                    {
+                    thread_id=thread_id,
+                    agent_id=self._agent_id,
+                    content={
                         "role": response.role,
                         "content": str(response.content),
                     }
-                )
+                ).history
 
             tool_results: list[Any] = []
             
@@ -177,12 +209,14 @@ class OpenAIAgent(BaseAgent):
                 tool_calls: list[dict[str, str]] = [tool_call.model_dump() for tool_call in response.tool_calls]
 
                 context = self.context_store.add_context(
-                    {
+                    thread_id=thread_id,
+                    agent_id=self._agent_id,
+                    content={
                         "role": response.role,
                         "tool_calls": tool_calls,
                         "content": str(response.content),
                     }
-                )
+                ).history
 
                 yield OpenAgentResponse(
                     role=response.role,
@@ -202,11 +236,19 @@ class OpenAIAgent(BaseAgent):
                     tool_results=tool_response.tool_results,
                 )
 
-                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
+                logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
 
-                context = self.context_store.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
+                context = self.context_store.extend_context(
+                    thread_id=thread_id,
+                    agent_id=self._agent_id,
+                    content=[
+                        tool_message.model_dump() 
+                        for tool_message in tool_response.tool_messages
+                    ] 
+                    if tool_response.tool_messages else []
+                ).history
 
-                logger.debug(f"Context: {context}") if debug else None
+                logger.debug(f"Context: {context}")
             else:
                 stop = True
 
@@ -262,30 +304,32 @@ class OpenAIAgent(BaseAgent):
         :return: An OpenAgentStreamingResponse generator.
         :rtype: Generator[OpenAgentStreamingResponse, None, None]
         """
-        temperature = kwargs.get("temperature", temperature)
-        if temperature is None:
-            temperature = self.temperature
-
-        max_tokens = kwargs.get("max_tokens", max_tokens)
-        if max_tokens is None:
-            max_tokens = self.max_tokens
-
-        top_p = kwargs.get("top_p", top_p)
-        if top_p is None:
-            top_p = self.top_p
-
-        debug = kwargs.get("debug", False)
+        temperature = kwargs.get("temperature", self.temperature)
+        max_tokens = kwargs.get("max_tokens", self.max_tokens)
+        top_p = kwargs.get("top_p", self.top_p)
+        thread_id = kwargs.get("thread_id", self._thread_id)
         
         if not tools:
             tools = self._llm_service.tools
 
         stop = False
 
-        context: list[dict[str, Any]] = self.context_store.extend_context(messages)
+        if thread_id != self._thread_id:
+            self.context_store.init_context(
+                thread_id=thread_id,
+                agent_id=self._agent_id,
+                system_message=self._system_message,
+            )
+
+        context: list[dict[str, Any]] = self.context_store.extend_context(
+            thread_id=thread_id,
+            agent_id=self._agent_id,
+            content=messages
+        ).history
 
         while not stop:
 
-            logger.debug(f"Context: {context}") if debug else None
+            logger.debug(f"Context: {context}")
 
             response_generator = self._llm_service.model_stream(
                 messages=context,
@@ -303,12 +347,14 @@ class OpenAIAgent(BaseAgent):
                 if chunk.finish_reason == "tool_calls" and chunk.tool_calls:
                     # Add the llm tool call request to the context
                     context = self.context_store.add_context(
-                        {
+                        thread_id=thread_id,
+                        agent_id=self._agent_id,
+                        content={
                             "role": "assistant",
                             "tool_calls": chunk.tool_calls,
                             "content": str(chunk.content),
                         }
-                    )
+                    ).history
 
                     yield OpenAgentStreamingResponse(
                         role=chunk.role,
@@ -317,7 +363,7 @@ class OpenAIAgent(BaseAgent):
                         usage=chunk.usage,
                     )
 
-                    logger.debug(f"Context: {context}") if debug else None
+                    logger.debug(f"Context: {context}")
 
                     # Handle the tool call request and get the final response with tool results
                     tool_response = self._tool_handler.handle_tool_request(
@@ -329,21 +375,30 @@ class OpenAIAgent(BaseAgent):
                         tool_results=tool_response.tool_results,
                     )
 
-                    logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}") if debug else None
-                    
-                    context = self.context_store.extend_context([tool_message.model_dump() for tool_message in tool_response.tool_messages] if tool_response.tool_messages else [])
-                    
-                    logger.debug(f"Context in Stream Execute: {context}") if debug else None
+                    logger.debug(f"Tool Messages in Execute: {tool_response.tool_messages}")
+
+                    context = self.context_store.extend_context(
+                        thread_id=thread_id,
+                        agent_id=self._agent_id,
+                        content=[
+                            tool_message.model_dump()
+                            for tool_message in tool_response.tool_messages
+                        ] if tool_response.tool_messages else []
+                    ).history
+
+                    logger.debug(f"Context in Stream Execute: {context}")
 
                 elif chunk.finish_reason == "stop":
                     if chunk.content:
                         context = self.context_store.add_context(
-                            {
-                                "role": "assistant", 
+                            thread_id=thread_id,
+                            agent_id=self._agent_id,
+                            content={
+                                "role": "assistant",
                                 "content": str(chunk.content),
                             }
-                        )
-                        logger.debug(f"Context: {context}") if debug else None
+                        ).history
+                        logger.debug(f"Context: {context}")
                         yield chunk
                         stop = True
                 else:
