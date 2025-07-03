@@ -149,7 +149,13 @@ class ValkeyContextStore(BaseContextStore):
 
         return contexts
 
-    def add_context(self, thread_id: str, agent_id: str, content: dict[str, Any]) -> ContextUnit:
+    def add_context(
+        self, 
+        thread_id: str, 
+        agent_id: str, 
+        content: dict[str, Any],
+        system_message: Optional[str] = None
+    ) -> ContextUnit:
         key = self._get_valkey_key(thread_id)
 
         with self._client.pipeline() as pipe: # type: ignore[no-redef]
@@ -169,12 +175,18 @@ class ValkeyContextStore(BaseContextStore):
                     if context is None:
                         pipe.unwatch()
                         # If context doesn't exist, create it with initial history and TTL
+                        if not system_message:
+                            raise ValueError("System message must be provided when initializing a new context.")
+                        
+                        new_history = [{"role": "system", "content": system_message}]
+                        new_history.append(content) if content else None
+
                         new_context = ContextUnit(
                             thread_id=thread_id,
                             agent_id=agent_id,
                             created_at=int(datetime.now().timestamp()),
                             updated_at=int(datetime.now().timestamp()),
-                            history=[content] # Add the first content here
+                            history=new_history # Add the initial content here
                         )
                         # Use set with nx=True and ex
                         set_result = self._client.set(
@@ -209,7 +221,13 @@ class ValkeyContextStore(BaseContextStore):
 
         return context
 
-    def extend_context(self, thread_id: str, agent_id: str, content: list[dict[str, Any]]) -> ContextUnit:
+    def extend_context(
+        self, 
+        thread_id: str, 
+        agent_id: str, 
+        content: list[dict[str, Any]],
+        system_message: Optional[str] = None
+    ) -> ContextUnit:
         key = self._get_valkey_key(thread_id)
 
         with self._client.pipeline() as pipe: # type: ignore[no-redef]
@@ -230,12 +248,18 @@ class ValkeyContextStore(BaseContextStore):
                     if context is None:
                         pipe.unwatch()
                         # If context doesn't exist, create it with initial history and TTL
+                        if not system_message:
+                            raise ValueError("System message must be provided when initializing a new context.")
+                        
+                        new_history = [{"role": "system", "content": system_message}]
+                        new_history.extend(content) if content else None
+
                         new_context = ContextUnit(
                             thread_id=thread_id,
                             agent_id=agent_id,
                             created_at=int(datetime.now().timestamp()),
                             updated_at=int(datetime.now().timestamp()),
-                            history=content # Add the initial content here
+                            history=new_history # Add the initial content here
                         )
                         # Use set with nx=True and ex
                         set_result = self._client.set(

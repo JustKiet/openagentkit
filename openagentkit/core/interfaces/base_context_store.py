@@ -61,26 +61,40 @@ class BaseContextStore(ABC):
         pass
     
     @abstractmethod
-    def add_context(self, thread_id: str, agent_id: str, content: dict[str, Any]) -> ContextUnit:
+    def add_context(
+        self, 
+        thread_id: str, 
+        agent_id: str, 
+        content: dict[str, Any], 
+        system_message: Optional[str] = None
+    ) -> ContextUnit:
         """
         Add context to the model.
 
         :param str thread_id: The ID of the context to add content to.
         :param str agent_id: The ID of the agent associated with the context.
         :param dict[str, Any] content: The content to add to the context.
+        :param Optional[str] system_message: An optional system message to set for the context in case thread_id does not exist.
         :return: The updated context history.
         :rtype: ContextUnit
         """
         pass
     
     @abstractmethod
-    def extend_context(self, thread_id: str, agent_id: str, content: list[dict[str, Any]]) -> ContextUnit:
+    def extend_context(
+        self, 
+        thread_id: str, 
+        agent_id: str, 
+        content: list[dict[str, Any]], 
+        system_message: Optional[str] = None
+    ) -> ContextUnit:
         """
         Extend the context of the model.
 
         :param str thread_id: The ID of the context to extend.
         :param str agent_id: The ID of the agent associated with the context.
         :param list[dict[str, Any]] content: The list of content to extend the context with.
+        :param Optional[str] system_message: An optional system message to set for the context in case thread_id does not exist.
         :return: The updated context history.
         :rtype: ContextUnit
         """

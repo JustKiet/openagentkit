@@ -86,17 +86,25 @@ class InMemoryContextStore(BaseContextStore):
             }
         return agent_contexts
 
-    def add_context(self, thread_id: str, agent_id: str, content: dict[str, Any]) -> ContextUnit:
+    def add_context(
+        self, 
+        thread_id: str, 
+        agent_id: str, 
+        content: dict[str, Any],
+        system_message: Optional[str] = None
+    ) -> ContextUnit:
         thread_lock = self._get_or_create_thread_lock(thread_id)
         with thread_lock: # Acquire lock specific to this thread_id
             if thread_id not in self._storage:
-                # If context doesn't exist, create it (without system message here, per your original logic)
+                if not system_message:
+                    raise ValueError("System message must be provided when initializing a new context.")
+                
                 self._storage[thread_id] = ContextUnit(
                     thread_id=thread_id,
                     agent_id=agent_id, # This assigns the agent_id to a newly created context
                     created_at=int(datetime.now().timestamp()),
                     updated_at=int(datetime.now().timestamp()),
-                    history=[]
+                    history=[{"role": "system", "content": system_message}]
                 )
             
             # IMPORTANT: Perform agent_id check *inside* the locked section
@@ -107,16 +115,25 @@ class InMemoryContextStore(BaseContextStore):
             self._storage[thread_id].updated_at = int(datetime.now().timestamp())
             return self._storage[thread_id]
 
-    def extend_context(self, thread_id: str, agent_id: str, content: list[dict[str, Any]]) -> ContextUnit:
+    def extend_context(
+        self, 
+        thread_id: str, 
+        agent_id: str, 
+        content: list[dict[str, Any]],
+        system_message: Optional[str] = None
+    ) -> ContextUnit:
         thread_lock = self._get_or_create_thread_lock(thread_id)
         with thread_lock: # Acquire lock specific to this thread_id
             if thread_id not in self._storage:
+                if not system_message:
+                    raise ValueError("System message must be provided when initializing a new context.")
+                
                 self._storage[thread_id] = ContextUnit(
                     thread_id=thread_id,
                     agent_id=agent_id, # This assigns the agent_id to a newly created context
                     created_at=int(datetime.now().timestamp()),
                     updated_at=int(datetime.now().timestamp()),
-                    history=[]
+                    history=[{'role': 'system', 'content': system_message}]
                 )
             
             # IMPORTANT: Perform agent_id check *inside* the locked section
@@ -153,3 +170,28 @@ class InMemoryContextStore(BaseContextStore):
                 logger.warning(f"Attempted to clear context for non-existent thread ID: {thread_id}")
                 return None
             return self._storage[thread_id]
+        
+    def delete_expired_contexts(self, expiration_time: int) -> int:
+        """
+        Delete contexts that have not been updated for a specified amount of time.
+        
+        :param int expiration_time: The time in seconds after which a context is considered expired.
+        :return: The number of contexts deleted.
+        :rtype: int
+        """
+        current_time = int(datetime.now().timestamp())
+        expired_thread_ids = [
+            thread_id for thread_id, context in self._storage.items()
+            if current_time - context.updated_at > expiration_time
+        ]
+        
+        with self._main_lock:
+            for thread_id in expired_thread_ids:
+                if thread_id in self._storage:
+                    del self._storage[thread_id]
+                    logger.info(f"Deleted expired context for thread ID: {thread_id}")
+                else:
+                    logger.warning(f"Attempted to delete non-existent context for thread ID: {thread_id}")
+                    
+        return len(expired_thread_ids)
+                    
