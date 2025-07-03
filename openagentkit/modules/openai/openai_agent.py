@@ -103,6 +103,16 @@ class OpenAIAgent(BaseAgent):
         """
         return self._thread_id
     
+    @property
+    def agent_id(self) -> str:
+        """
+        Get the agent ID for the agent.
+
+        Returns:
+            The agent ID.
+        """
+        return self._agent_id
+    
     def clone(self) -> 'OpenAIAgent':
         """
         Clone the OpenAIAgent object.

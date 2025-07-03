@@ -48,6 +48,17 @@ class BaseContextStore(ABC):
         :rtype: Optional[ContextUnit]
         """
         pass
+
+    @abstractmethod
+    def get_agent_context(self, agent_id: str) -> dict[str, ContextUnit]:
+        """
+        Get all contexts associated with a specific agent ID.
+
+        :param str agent_id: The ID of the agent to retrieve contexts for.
+        :return: A dictionary mapping thread IDs to their respective ContextUnit objects.
+        :rtype: dict[str, ContextUnit]
+        """
+        pass
     
     @abstractmethod
     def add_context(self, thread_id: str, agent_id: str, content: dict[str, Any]) -> ContextUnit:

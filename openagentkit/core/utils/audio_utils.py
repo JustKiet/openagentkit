@@ -1,8 +1,10 @@
 import io
 import wave
-from loguru import logger
+import logging
 from typing import Literal, TypeAlias
 import struct
+
+logger = logging.getLogger(__name__)
 
 AudioFormat: TypeAlias = Literal[
     "wav", "webm", "mp3", "ogg", "flac", "aac", "aiff",

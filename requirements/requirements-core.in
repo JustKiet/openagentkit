@@ -1,5 +1,4 @@
-loguru
-scipy
-pydantic
-mcp[cli]
-httpx
+scipy==1.16.0
+pydantic==2.11.3
+mcp[cli]==1.6.0
+httpx==0.28.1
