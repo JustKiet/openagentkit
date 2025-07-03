@@ -231,7 +231,7 @@ class OpenAILLMService(BaseLLMModel):
             )
 
         else:
-            if audio or audio_format or audio_voice:
+            if audio and audio_format or audio and audio_voice:
                 raise ValueError("Audio is not supported with Structured Output.")
             # Handle the client request with response schema
             client_response = self._client.beta.chat.completions.parse(

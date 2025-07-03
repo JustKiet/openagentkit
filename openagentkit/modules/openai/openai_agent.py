@@ -202,7 +202,7 @@ class OpenAIAgent(BaseAgent):
                 reasoning_effort=reasoning_effort,
             )
 
-            logger.info(f"Response Received: {response}")
+            logger.debug(f"Response Received: {response}")
             
             if response.content is not None:
                 # Add the response to the context (chat history)
