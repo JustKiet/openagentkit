@@ -2,3 +2,5 @@
 -r requirements-openai.in
 -r requirements-milvus.in
 -r requirements-voyageai.in
+-r requirements-redis.in
+-r requirements-valkey.in
