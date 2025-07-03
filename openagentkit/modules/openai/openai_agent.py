@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Generator
+from typing import Any, Dict, List, Optional, Generator, Literal
 import os
 import logging
 from openai import OpenAI
@@ -142,6 +142,7 @@ class OpenAIAgent(BaseAgent):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any,
     ) -> Generator[OpenAgentResponse, None, None]:
         """
@@ -156,6 +157,7 @@ class OpenAIAgent(BaseAgent):
         :param Optional[bool] audio: Whether to return audio in the response.
         :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
         :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort level.
         :param kwargs: Additional keyword arguments.
         :return: An OpenAgentResponse generator.
         :rtype: Generator[OpenAgentResponse, None, None]
@@ -197,6 +199,7 @@ class OpenAIAgent(BaseAgent):
                 audio=audio,
                 audio_format=audio_format,
                 audio_voice=audio_voice,
+                reasoning_effort=reasoning_effort,
             )
 
             logger.info(f"Response Received: {response}")
@@ -296,6 +299,7 @@ class OpenAIAgent(BaseAgent):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any,
     ) -> Generator[OpenAgentStreamingResponse, None, None]:
         """
@@ -310,6 +314,7 @@ class OpenAIAgent(BaseAgent):
         :param Optional[bool] audio: Whether to return audio in the response.
         :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
         :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort level.
         :param kwargs: Additional keyword arguments.
         :return: An OpenAgentStreamingResponse generator.
         :rtype: Generator[OpenAgentStreamingResponse, None, None]
@@ -351,6 +356,7 @@ class OpenAIAgent(BaseAgent):
                 audio=audio,
                 audio_format=audio_format,
                 audio_voice=audio_voice,
+                reasoning_effort=reasoning_effort,
             )
             
             for chunk in response_generator:

@@ -332,32 +332,50 @@ class OpenAILLMService(BaseLLMModel):
 
         if tools is None:
             tools = self.tools
-
-        if audio and not audio_format:
-            raise ValueError("Audio format is required when audio is True")
-        
-        if audio and not audio_voice:
-            raise ValueError("Audio voice is required when audio is True")
         
         if not response_schema:
-            client_stream = self._client.chat.completions.create( # type: ignore
-                model=self._model,
-                messages=messages, # type: ignore
-                tools=tools, # type: ignore
-                temperature=temperature,
-                max_completion_tokens=max_tokens,
-                top_p=top_p,
-                reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
-                stream=True,
-                stream_options=ChatCompletionStreamOptionsParam(
-                    include_usage=True,
-                ),
-                modalities=["text", "audio"] if audio else ["text"],
-                audio=ChatCompletionAudioParam(
-                    format=audio_format,
-                    voice=audio_voice,
-                ) if audio and audio_format and audio_voice else None,
-            )
+            if audio:
+                if not audio_format:
+                    raise ValueError("Audio format is required when audio is True")
+                
+                if not audio_voice:
+                    raise ValueError("Audio voice is required when audio is True")
+                
+                if reasoning_effort:
+                    raise ValueError("Reasoning is not supported with audio responses")
+                
+                client_stream = self._client.chat.completions.create( # type: ignore
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    top_p=top_p,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                    stream=True,
+                    stream_options=ChatCompletionStreamOptionsParam(
+                        include_usage=True,
+                    ),
+                    modalities=["text", "audio"] if audio else ["text"],
+                    audio=ChatCompletionAudioParam(
+                        format=audio_format,
+                        voice=audio_voice,
+                    ) if audio and audio_format and audio_voice else None,
+                )
+            else:
+                client_stream = self._client.chat.completions.create( # type: ignore
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    top_p=top_p,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                    stream=True,
+                    stream_options=ChatCompletionStreamOptionsParam(
+                        include_usage=True,
+                    ),
+                )
 
             client_stream = cast(Iterable[ChatCompletionChunk], client_stream)
 
