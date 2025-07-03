@@ -139,6 +139,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = None,
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any
     ) -> OpenAgentResponse:
         """
@@ -153,6 +154,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         :param Optional[bool] audio: Whether to include audio in the response.
         :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
         :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
         :param kwargs: Additional keyword arguments.
         :return: An OpenAgentResponse object.
         :rtype: OpenAgentResponse
@@ -175,19 +177,37 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
 
         if response_schema is None:
             # Handle the client request without response schema
-            client_response = await self._client.chat.completions.create(
-                model=self._model,
-                messages=messages, # type: ignore
-                tools=tools if tools else NOT_GIVEN, # type: ignore
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=top_p,
-                modalities=["text", "audio"] if audio else ["text"],
-                audio=ChatCompletionAudioParam(
-                    format=audio_format,
-                    voice=audio_voice,
-                ) if audio and audio_format and audio_voice else None,
-            )
+            if audio:
+                if not audio_format:
+                    raise ValueError("Audio format is required when audio is True")
+                
+                if not audio_voice:
+                    raise ValueError("Audio voice is required when audio is True")
+                
+                client_response = await self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools if tools else NOT_GIVEN, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    top_p=top_p,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                    modalities=["text", "audio"] if audio else ["text"],
+                    audio=ChatCompletionAudioParam(
+                        format=audio_format,
+                        voice=audio_voice,
+                    ) if audio and audio_format and audio_voice else None,
+                )
+            else:
+                client_response = await self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools if tools else NOT_GIVEN, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    top_p=top_p,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                )
             
             response_message = client_response.choices[0].message
 
@@ -215,6 +235,9 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             )
 
         else:
+            if audio or audio_format or audio_voice:
+                raise ValueError("Audio is not supported with Structured Output.")
+            
             # Handle the client request with response schema
             client_response = await self._client.beta.chat.completions.parse(
                 model=self._model,
@@ -222,8 +245,9 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
                 tools=tools if tools else NOT_GIVEN, # type: ignore
                 response_format=response_schema, # type: ignore
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
                 top_p=top_p,
+                reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
             )
 
             response_message = client_response.choices[0].message
@@ -283,6 +307,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = None,
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any
     ) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
         """
@@ -297,6 +322,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         :param Optional[bool] audio: Whether to include audio in the response.
         :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
         :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response.
         :param kwargs: Additional keyword arguments.
         :return: An AsyncGenerator[OpenAgentStreamingResponse, None] object.
         :rtype: AsyncGenerator[OpenAgentStreamingResponse, None]
@@ -327,23 +353,48 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             raise ValueError("Audio voice is required when audio is True")
         
         if not response_schema:
-            client_stream = await self._client.chat.completions.create( # type: ignore
-                model=self._model,
-                messages=messages, # type: ignore
-                tools=tools, # type: ignore
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=top_p,
-                stream=True,
-                stream_options=ChatCompletionStreamOptionsParam(
-                    include_usage=True,
-                ),
-                modalities=["text", "audio"] if audio else ["text"],
-                audio=ChatCompletionAudioParam(
-                    format=audio_format,
-                    voice=audio_voice,
-                ) if audio and audio_format and audio_voice else None,
-            )
+            if audio:
+                if not audio_format:
+                    raise ValueError("Audio format is required when audio is True")
+                
+                if not audio_voice:
+                    raise ValueError("Audio voice is required when audio is True")
+                
+                if reasoning_effort:
+                    raise ValueError("Reasoning is not supported for audio responses")
+                
+                client_stream = await self._client.chat.completions.create( # type: ignore
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                    top_p=top_p,
+                    stream=True,
+                    stream_options=ChatCompletionStreamOptionsParam(
+                        include_usage=True,
+                    ),
+                    modalities=["text", "audio"] if audio else ["text"],
+                    audio=ChatCompletionAudioParam(
+                        format=audio_format,
+                        voice=audio_voice,
+                    ) if audio and audio_format and audio_voice else None,
+                )
+            else:
+                client_stream = await self._client.chat.completions.create( # type: ignore
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                    top_p=top_p,
+                    stream=True,
+                    stream_options=ChatCompletionStreamOptionsParam(
+                        include_usage=True,
+                    ),
+                )
 
             client_stream = cast(AsyncIterable[ChatCompletionChunk], client_stream)
 
@@ -468,6 +519,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = None,
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any
     ) -> OpenAgentResponse:
         """
@@ -482,6 +534,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         :param Optional[bool] audio: Whether to include audio in the response.
         :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
         :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
         :param kwargs: Additional keyword arguments.
         :return: An OpenAgentResponse object.
         :rtype: OpenAgentResponse
@@ -514,6 +567,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             audio=audio,
             audio_format=audio_format,
             audio_voice=audio_voice,
+            reasoning_effort=reasoning_effort,
         )
         
         return response
@@ -529,6 +583,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any
     ) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
         """
@@ -543,6 +598,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
         :param Optional[bool] audio: Whether to include audio in the response.
         :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
         :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
         :param kwargs: Additional keyword arguments.
         :return: An AsyncGenerator[OpenAgentStreamingResponse, None] object.
         :rtype: AsyncGenerator[OpenAgentStreamingResponse, None]
@@ -576,6 +632,7 @@ class AsyncOpenAILLMService(AsyncBaseLLMModel):
             audio=audio,
             audio_format=audio_format,
             audio_voice=audio_voice,
+            reasoning_effort=reasoning_effort,
         )
 
         async for chunk in generator:

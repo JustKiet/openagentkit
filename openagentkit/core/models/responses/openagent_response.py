@@ -12,6 +12,7 @@ class OpenAgentResponse(BaseModel):
     ```python
     class OpenAgentResponse(BaseModel):
         role: str
+        reasoning: Optional[str] = None
         content: Optional[Union[str, BaseModel, dict]] = None
         tool_calls: Optional[List[ToolCall] = None
         tool_results: Optional[List[Any]] = None
@@ -21,6 +22,7 @@ class OpenAgentResponse(BaseModel):
     ```
     Where:
         - `role`: The role of the response.
+        - `reasoning`: The reasoning behind the response (Only for reasoning model).
         - `content`: The content of the response.
         - `tool_calls`: The list of tool calls of the response.
         - `tool_results`: The list of tool results of the response.
@@ -29,6 +31,7 @@ class OpenAgentResponse(BaseModel):
         - `usage`: The usage of the response.
     """
     role: str
+    reasoning: Optional[str] = None
     content: Optional[Union[str, BaseModel, dict[str, str]]] = None
     tool_calls: Optional[list[ToolCall]] = None
     tool_results: Optional[list[Any]] = None

@@ -1,4 +1,4 @@
-from typing import Any, AsyncGenerator, Dict, List, Optional
+from typing import Any, AsyncGenerator, Dict, List, Optional, Literal
 import os
 from openai import AsyncOpenAI
 from openagentkit.core.interfaces import AsyncBaseAgent, BaseContextStore
@@ -149,6 +149,7 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any,
     ) -> AsyncGenerator[OpenAgentResponse, None]:
         """
@@ -163,6 +164,7 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         :param bool audio: Whether to use audio in the response.
         :param OpenAIAudioFormats audio_format: The format to use in the response.
         :param OpenAIAudioVoices audio_voice: The voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
         :param kwargs: Additional keyword arguments.
         :return: An OpenAgentResponse asynchronous generator.
         :rtype: AsyncGenerator[OpenAgentResponse, None]
@@ -204,6 +206,7 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
                 audio=audio,
                 audio_format=audio_format,
                 audio_voice=audio_voice,
+                reasoning_effort=reasoning_effort
             )
 
             logger.info(f"Response Received: {response}")
@@ -302,6 +305,7 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any,
     ) -> AsyncGenerator[OpenAgentStreamingResponse, None]:
         """
@@ -316,6 +320,7 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         :param bool audio: Whether to use audio in the response.
         :param OpenAIAudioFormats audio_format: The format to use in the response.
         :param OpenAIAudioVoices audio_voice: The voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
         :param kwargs: Additional keyword arguments.
         :return: An OpenAgentStreamingResponse asynchronous generator.
         :rtype: AsyncGenerator[OpenAgentStreamingResponse, None]
@@ -356,6 +361,7 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
                 audio=audio,
                 audio_format=audio_format,
                 audio_voice=audio_voice,
+                reasoning_effort=reasoning_effort
             )
             
             async for chunk in response_generator:
