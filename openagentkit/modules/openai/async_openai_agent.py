@@ -27,6 +27,8 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
+        thread_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
     ) -> None:
         self._llm_service = AsyncOpenAILLMService(
             client=client,
@@ -47,8 +49,15 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         
         self.context_store: BaseContextStore = context_store
 
-        self._thread_id = str(uuid.uuid4())
-        self._agent_id = str(uuid.uuid4())
+        if not thread_id:
+            thread_id = str(uuid.uuid4())
+
+        self._thread_id = thread_id
+
+        if not agent_id:
+            agent_id = str(uuid.uuid4())
+        
+        self._agent_id = agent_id
 
         self._system_message = system_message or "You are a helpful assistant."
 

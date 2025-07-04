@@ -20,7 +20,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ## Installation
 
 ```bash
-pip install openagentkit==0.1.0a3
+pip install openagentkit==0.1.0a4
 ```
 
 ## Quick Start
@@ -176,6 +176,95 @@ print(get_weather.schema)
 # Run the tool like any other function
 weather_response = get_weather("Hanoi")
 print(weather_response) 
+```
+
+### Custom Context Store
+
+An Agent must have access to context (chat) history to be truly an agent. OpenAgentKit has a ContextStore module that supports various cache providers (Redis, Valkey) and a quick module for testing (InMemory)
+
+```python
+from openagentkit.modules.openai import AsyncOpenAIAgent
+from openagentkit.core.context import InMemoryContextStore
+import openai
+import asyncio
+from dotenv import load_dotenv
+from pydantic import BaseModel
+import os
+
+load_dotenv()
+
+context_store = InMemoryContextStore()
+
+async def main():
+    client = openai.AsyncOpenAI(
+        api_key=os.getenv("OPENAI_API_KEY"),
+    )
+
+    # When initializing an agent, you can pass in a thread_id or agent_id as identifier for the default context scope. The 2 values are immutable for consistency.
+    agent = AsyncOpenAIAgent(
+        client=client,
+        system_message="You are a helpful assistant.",
+        context_store=context_store,
+        thread_id="test"
+        agent_id="AssistantA"
+    )
+
+    # Access the thread_id property
+    print(f"Thread ID: {agent.thread_id}")
+
+    async for event in agent.execute(
+        messages=[
+            {
+                "role": "user",
+                "content": "Hi, my name is John."
+            }
+        ]
+    ):
+        if event.content:
+            print(f"Response: {event.content}")
+
+    # If no thread_id is defined when executing the agent, it will defaults to the initialized thread_id attribute.
+    async for event in agent.execute(
+        messages=[
+            {
+                "role": "user",
+                "content": "What is my name?"
+            }
+        ]
+    ):
+        if event.content:
+            print(f"Response: {event.content}")
+
+    async for event in agent.execute(
+        messages=[
+            {
+                "role": "user",
+                "content": "What is my name?"
+            }
+        ],
+        thread_id="new_context" # Since this is a new thread, the agent will no longer knowledge of the previous interaction
+    ):
+        if event.content:
+            print(f"Response: {event.content}")
+
+    # If no thread_id is defined when executing the agent, it will defaults to the initialized thread_id attribute.
+    async for event in agent.execute(
+        messages=[
+            {
+                "role": "user",
+                "content": "Okay lovely, can you refer me to my name at the end of your sentence always?"
+            }
+        ],
+    ):
+        if event.content:
+            print(f"Response: {event.content}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+    # Get Contexts related to agent instance (Agent ID)
+    print(context_store.get_agent_context(agent.agent_id))
+    # Get Context from thread_id
+    print(context_store.get_context("new_context"))
 ```
 
 #### By subclassing Tool:
