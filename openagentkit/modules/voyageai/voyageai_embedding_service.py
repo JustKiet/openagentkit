@@ -268,8 +268,6 @@ class VoyageAIEmbeddingModel(BaseEmbeddingModel[str]):
             model=self.embedding_model,
             input_type=input_type,
             truncation=truncation,
-            output_dtype="float",
-            output_dimension=self.dimensions,
         )
 
         embedding_units: list[EmbeddingUnit] = []

@@ -21,7 +21,10 @@ from openagentkit.core.models.responses.audio_response import AudioResponse
 from openagentkit.modules.openai import OpenAIAudioFormats, OpenAIAudioVoices
 from typing import Generator
 import os
-from loguru import logger
+import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 class OpenAILLMService(BaseLLMModel):
     def __init__(
@@ -128,8 +131,8 @@ class OpenAILLMService(BaseLLMModel):
     
     def _handle_client_request(
         self,
-        messages: List[Dict[str, str]],
-        tools: Optional[Union[List[Dict[str, Any]], NotGiven]] = None,
+        messages: list[dict[str, str]],
+        tools: Optional[Union[list[dict[str, Any]], NotGiven]] = None,
         response_schema: Union[type[BaseModel], NotGiven] = NOT_GIVEN,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -137,53 +140,70 @@ class OpenAILLMService(BaseLLMModel):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = None,
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any
     ) -> OpenAgentResponse:
         """
         Handle the client request.
 
-        Args:
-            messages: The messages to send to the model.
-            tools: The tools to use in the response.
-            response_schema: The schema to use in the response.
-            temperature: The temperature to use in the response.
-            max_tokens: The max tokens to use in the response.
-            top_p: The top p to use in the response.
-
-        Returns:
-            An OpenAgentResponse object.
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[Union[list[dict[str, Any]], NotGiven]] tools: The tools to use in the response.
+        :param Union[type[BaseModel], NotGiven] response_schema: The schema to use in the response.
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The max tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[bool] audio: Whether to include audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
+        :param kwargs: Additional keyword arguments.
+        :return: An OpenAgentResponse object.
+        :rtype: OpenAgentResponse
         """
-
-        temperature = kwargs.get("temperature", temperature)
-        if temperature is None:
-            temperature = self.temperature
-
-        max_tokens = kwargs.get("max_tokens", max_tokens)
-        if max_tokens is None:
-            max_tokens = self.max_tokens
-
-        top_p = kwargs.get("top_p", top_p)
-        if top_p is None:
-            top_p = self.top_p
+        temperature = kwargs.get("temperature", self.temperature)
+        max_tokens = kwargs.get("max_tokens", self.max_tokens)
+        top_p = kwargs.get("top_p", self.top_p)
 
         if tools is None:
             tools = NOT_GIVEN
 
         if response_schema is NOT_GIVEN or isinstance(response_schema, NotGiven):
-            # Handle the client request without response schema
-            client_response = self._client.chat.completions.create(
-                model=self._model,
-                messages=messages, # type: ignore
-                tools=tools, # type: ignore
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=top_p,
-                modalities=["text", "audio"] if audio else ["text"],
-                audio=ChatCompletionAudioParam(
-                    format=audio_format,
-                    voice=audio_voice,
-                ) if audio and audio_format and audio_voice else None,
-            )
+            if audio:
+                if not audio_format:
+                    raise ValueError("Audio format is required when audio is True")
+                
+                if not audio_voice:
+                    raise ValueError("Audio voice is required when audio is True")
+                
+                if reasoning_effort:
+                    raise ValueError("Reasoning is not supported with audio responses")
+                
+                # Handle the client request without response schema
+                client_response = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools if tools else NOT_GIVEN, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    top_p=top_p,
+                    reasoning_effort= reasoning_effort if reasoning_effort else NOT_GIVEN,
+                    modalities=["text", "audio"] if audio else ["text"],
+                    audio=ChatCompletionAudioParam(
+                        format=audio_format,
+                        voice=audio_voice,
+                    ) if audio and audio_format and audio_voice else None,
+                )
+            else:
+                # Handle the client request without response schema
+                client_response = self._client.chat.completions.create(
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools if tools else NOT_GIVEN, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    top_p=top_p,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                )
             
             response_message = client_response.choices[0].message
 
@@ -211,6 +231,8 @@ class OpenAILLMService(BaseLLMModel):
             )
 
         else:
+            if audio and audio_format or audio and audio_voice:
+                raise ValueError("Audio is not supported with Structured Output.")
             # Handle the client request with response schema
             client_response = self._client.beta.chat.completions.parse(
                 model=self._model,
@@ -218,16 +240,19 @@ class OpenAILLMService(BaseLLMModel):
                 tools=tools, # type: ignore
                 response_format=response_schema, # type: ignore
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
                 top_p=top_p,
+                reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
             )
 
             response_message = client_response.choices[0].message
 
+            parsed_content = response_schema(**json.loads(response_message.content)) if response_message.content else None
+
             # Create the response object
             response = OpenAgentResponse(
                 role=response_message.role,
-                content=response_message.content,
+                content=parsed_content,
                 tool_calls=[
                     ToolCall(
                         id=tool_call.id,
@@ -268,8 +293,8 @@ class OpenAILLMService(BaseLLMModel):
     
     def _handle_client_stream(
         self,
-        messages: List[Dict[str, str]],
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[dict[str, str]],
+        tools: Optional[list[dict[str, Any]]] = None,
         response_schema: Optional[type[BaseModel]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -277,68 +302,80 @@ class OpenAILLMService(BaseLLMModel):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = None,
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any
     ) -> Generator[OpenAgentStreamingResponse, None, None]:
         """
         Handle the client stream.
-
-        Args:
-            messages: The messages to send to the model.
-            tools: The tools to use in the response.
-            response_schema: The schema to use in the response. **(not implemented yet)**
-            temperature: The temperature to use in the response.
-            max_tokens: The max tokens to use in the response.
-            top_p: The top p to use in the response.
-            audio: Whether to include audio in the response.
-            audio_format: The audio format to use in the response.
-            audio_voice: The audio voice to use in the response.
-
-        Returns:
-            A Generator[OpenAgentStreamingResponse, None] object.
+        
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[list[dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response.
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The max tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[bool] audio: Whether to include audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
+        :param kwargs: Additional keyword arguments.
+        :return: A generator that yields OpenAgentStreamingResponse objects.
+        :rtype: Generator[OpenAgentStreamingResponse, None, None]
         """
         # TODO: THIS IS A PLACEHOLDER FOR NOW, WE NEED TO IMPLEMENT THE STREAMING FOR THE RESPONSE SCHEMA
         if isinstance(response_schema, BaseModel):
             raise ValueError("Response schema is not supported for streaming")
         
-        temperature = kwargs.get("temperature", temperature)
-        if temperature is None:
-            temperature = self.temperature
-
-        max_tokens = kwargs.get("max_tokens", max_tokens)
-        if max_tokens is None:
-            max_tokens = self.max_tokens
-
-        top_p = kwargs.get("top_p", top_p)
-        if top_p is None:
-            top_p = self.top_p
+        temperature = kwargs.get("temperature", self.temperature)
+        max_tokens = kwargs.get("max_tokens", self.max_tokens)
+        top_p = kwargs.get("top_p", self.top_p)
 
         if tools is None:
             tools = self.tools
-
-        if audio and not audio_format:
-            raise ValueError("Audio format is required when audio is True")
-        
-        if audio and not audio_voice:
-            raise ValueError("Audio voice is required when audio is True")
         
         if not response_schema:
-            client_stream = self._client.chat.completions.create( # type: ignore
-                model=self._model,
-                messages=messages, # type: ignore
-                tools=tools, # type: ignore
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=top_p,
-                stream=True,
-                stream_options=ChatCompletionStreamOptionsParam(
-                    include_usage=True,
-                ),
-                modalities=["text", "audio"] if audio else ["text"],
-                audio=ChatCompletionAudioParam(
-                    format=audio_format,
-                    voice=audio_voice,
-                ) if audio and audio_format and audio_voice else None,
-            )
+            if audio:
+                if not audio_format:
+                    raise ValueError("Audio format is required when audio is True")
+                
+                if not audio_voice:
+                    raise ValueError("Audio voice is required when audio is True")
+                
+                if reasoning_effort:
+                    raise ValueError("Reasoning is not supported with audio responses")
+                
+                client_stream = self._client.chat.completions.create( # type: ignore
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    top_p=top_p,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                    stream=True,
+                    stream_options=ChatCompletionStreamOptionsParam(
+                        include_usage=True,
+                    ),
+                    modalities=["text", "audio"] if audio else ["text"],
+                    audio=ChatCompletionAudioParam(
+                        format=audio_format,
+                        voice=audio_voice,
+                    ) if audio and audio_format and audio_voice else None,
+                )
+            else:
+                client_stream = self._client.chat.completions.create( # type: ignore
+                    model=self._model,
+                    messages=messages, # type: ignore
+                    tools=tools, # type: ignore
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    top_p=top_p,
+                    reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
+                    stream=True,
+                    stream_options=ChatCompletionStreamOptionsParam(
+                        include_usage=True,
+                    ),
+                )
 
             client_stream = cast(Iterable[ChatCompletionChunk], client_stream)
 
@@ -434,8 +471,9 @@ class OpenAILLMService(BaseLLMModel):
                 messages=messages, # type: ignore
                 tools=tools, # type: ignore
                 temperature=temperature,
-                max_tokens=max_tokens,
+                max_completion_tokens=max_tokens,
                 top_p=top_p,
+                reasoning_effort=reasoning_effort if reasoning_effort else NOT_GIVEN,
                 stream_options={"include_usage": True},
                 response_format=response_schema,
             ) as client_stream:
@@ -454,7 +492,7 @@ class OpenAILLMService(BaseLLMModel):
         
     def model_generate(
         self, 
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         response_schema: Optional[type[BaseModel]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
@@ -463,33 +501,25 @@ class OpenAILLMService(BaseLLMModel):
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = None,
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any
     ) -> OpenAgentResponse:
         """
         Generate a response from the model.
         
-        Args:
-            messages: The messages to send to the model.
-            tools: The tools to use in the response.
-            response_schema: The schema to use in the response.
-            temperature: The temperature to use in the response.
-            max_tokens: The max tokens to use in the response.
-            top_p: The top p to use in the response.
-            audio: Whether to include audio in the response.
-            audio_format: The audio format to use in the response.
-            audio_voice: The audio voice to use in the response.
-
-        Returns:
-            An OpenAgentResponse object.
-
-        Example:
-        ```python
-        from openagentkit.tools import duckduckgo_search_tool
-        from openagentkit.modules.openai import AsyncOpenAILLMService
-
-        llm_service = AsyncOpenAILLMService(client, tools=[duckduckgo_search_tool])
-        response = await llm_service.model_generate(messages=[{"role": "user", "content": "What is TECHVIFY?"}])
-        ```
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response.
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The max tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[List[Dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[bool] audio: Whether to include audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
+        :param kwargs: Additional keyword arguments.
+        :return: An OpenAgentResponse object.
+        :rtype: OpenAgentResponse
         """
         temperature = kwargs.get("temperature", temperature)
         if temperature is None:
@@ -519,39 +549,41 @@ class OpenAILLMService(BaseLLMModel):
             audio=audio,
             audio_format=audio_format,
             audio_voice=audio_voice,
+            reasoning_effort=reasoning_effort
         )
         
         return response
 
     def model_stream(
         self,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         response_schema: Optional[type[BaseModel]] = None,
         temperature: Optional[float] = None,
         max_tokens: Optional[int] = None,
         top_p: Optional[float] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        tools: Optional[list[dict[str, Any]]] = None,
         audio: Optional[bool] = False,
         audio_format: Optional[OpenAIAudioFormats] = "pcm16",
         audio_voice: Optional[OpenAIAudioVoices] = "alloy",
+        reasoning_effort: Optional[Literal["low", "medium", "high"]] = None,
         **kwargs: Any
     ) -> Generator[OpenAgentStreamingResponse, None, None]:
         """
         Generate a response from the model.
 
-        Args:
-            messages: The messages to send to the model.
-            tools: The tools to use in the response.
-            response_schema: The schema to use in the response. **(not implemented yet)**
-            temperature: The temperature to use in the response.
-            max_tokens: The max tokens to use in the response.
-            top_p: The top p to use in the response.
-            audio: Whether to include audio in the response.
-            audio_format: The audio format to use in the response.
-            audio_voice: The audio voice to use in the response.
-
-        Returns:
-            An AsyncGenerator[OpenAgentStreamingResponse, None] object.
+        :param list[dict[str, str]] messages: The messages to send to the model.
+        :param Optional[type[BaseModel]] response_schema: The schema to use in the response.
+        :param Optional[float] temperature: The temperature to use in the response.
+        :param Optional[int] max_tokens: The max tokens to use in the response.
+        :param Optional[float] top_p: The top p to use in the response.
+        :param Optional[list[dict[str, Any]]] tools: The tools to use in the response.
+        :param Optional[bool] audio: Whether to include audio in the response.
+        :param Optional[OpenAIAudioFormats] audio_format: The audio format to use in the response.
+        :param Optional[OpenAIAudioVoices] audio_voice: The audio voice to use in the response.
+        :param Optional[Literal["low", "medium", "high"]] reasoning_effort: The reasoning effort to use in the response (Only for reasoning models).
+        :param kwargs: Additional keyword arguments.
+        :return: A generator that yields OpenAgentStreamingResponse objects.
+        :rtype: Generator[OpenAgentStreamingResponse, None, None]
         """
         # TODO: Handle the case with response schema (not working)
         if isinstance(response_schema, BaseModel):
@@ -582,6 +614,7 @@ class OpenAILLMService(BaseLLMModel):
             audio=audio,
             audio_format=audio_format,
             audio_voice=audio_voice,
+            reasoning_effort=reasoning_effort
         )
 
         for chunk in generator:

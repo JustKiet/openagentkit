@@ -8,3 +8,5 @@ from .base_embedding_model import BaseEmbeddingModel # type: ignore
 from .async_base_embedding_model import AsyncBaseEmbeddingModel # type: ignore
 from .async_reranker_model import AsyncBaseRerankerModel # type: ignore
 from .base_reranker_model import BaseRerankerModel # type: ignore
+from .base_context_store import BaseContextStore # type: ignore
+from .async_base_context_store import AsyncBaseContextStore # type: ignore

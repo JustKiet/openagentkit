@@ -2,10 +2,12 @@ from typing import Optional, Literal, Generator
 from openagentkit.core.interfaces import BaseTTSModel, BaseSTTModel
 from openagentkit.core._types import NamedBytesIO
 from openai import OpenAI
-from loguru import logger
+import logging
 
 from openagentkit.core.utils.audio_utils import AudioUtility
 from openagentkit.modules.openai import OpenAIAudioVoices
+
+logger = logging.getLogger(__name__)
 
 class OpenAISTTService(BaseSTTModel):
     def __init__(

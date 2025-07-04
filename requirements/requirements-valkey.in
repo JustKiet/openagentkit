@@ -1,2 +1,2 @@
 -r requirements-core.in
-pymilvus
+valkey
