@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openagentkit"
-version = "0.1.0-alpha.6"
+version = "0.1.0-alpha.7"
 description = "An open-source framework for building and deploying AI agents."
 readme = "README.md"
 authors = [
