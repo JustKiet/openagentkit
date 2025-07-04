@@ -285,10 +285,11 @@ async def main():
         if event.content:
             print(f"Response: {event.content}")
 
-if __name__ == "__main__":
-    asyncio.run(main())
     # Get Contexts related to agent instance (Agent ID)
     print(context_store.get_agent_context(agent.agent_id))
+
+if __name__ == "__main__":
+    asyncio.run(main())
     # Get Context from thread_id
     print(context_store.get_context("new_context"))
 ```
