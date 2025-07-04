@@ -1,6 +1,6 @@
 # OpenAgentKit
 
-[![PyPI version](https://badge.fury.io/py/openagentkit.svg)](https://pypi.org/project/openagentkit/0.1.0a8/)
+[![PyPI version](https://badge.fury.io/py/openagentkit.svg)](https://pypi.org/project/openagentkit/0.1.0a9/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 A comprehensive open-source toolkit for building agentic applications. OpenAgentKit provides a unified interface to work with various LLM providers, tools, and agent frameworks.
@@ -20,7 +20,7 @@ A comprehensive open-source toolkit for building agentic applications. OpenAgent
 ## Installation
 
 ```bash
-pip install openagentkit==0.1.0a8
+pip install openagentkit==0.1.0a9
 ```
 
 ## Quick Start

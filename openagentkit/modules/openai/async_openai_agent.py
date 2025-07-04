@@ -24,9 +24,9 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
         tools: Optional[List[Tool]] = None,
         context_store: Optional[BaseContextStore] = None,
         api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-        temperature: Optional[float] = None,
+        temperature: Optional[float] = 1.0,
         max_tokens: Optional[int] = None,
-        top_p: Optional[float] = None,
+        top_p: Optional[float] = 1.0,
         thread_id: Optional[str] = None,
         agent_id: Optional[str] = None,
     ) -> None:

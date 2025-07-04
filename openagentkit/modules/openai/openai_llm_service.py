@@ -33,9 +33,9 @@ class OpenAILLMService(BaseLLMModel):
         model: str = "gpt-4o-mini",
         tools: Optional[List[Tool]] = None,
         api_key: Optional[str] = os.getenv("OPENAI_API_KEY"),
-        temperature: Optional[float] = 0.3,
+        temperature: Optional[float] = 1.0,
         max_tokens: Optional[int] = None,
-        top_p: Optional[float] = None,
+        top_p: Optional[float] = 1.0,
     ) -> None:
         super().__init__(
             model=model,
