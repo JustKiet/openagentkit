@@ -177,3 +177,5 @@ cython_debug/
 tests/
 
 DEV_GUIDELINE.md
+
+backup/
