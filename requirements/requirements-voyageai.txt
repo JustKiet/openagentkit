@@ -94,8 +94,10 @@ numpy==2.2.4
     #   -r ./requirements/requirements-core.txt
     #   scipy
     #   voyageai
-packaging==25.0
-    # via huggingface-hub
+packaging==24.0
+    # via
+    #   -r ./requirements/requirements-voyageai.in
+    #   huggingface-hub
 pillow==11.2.1
     # via voyageai
 propcache==0.3.1
