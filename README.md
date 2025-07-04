@@ -178,6 +178,32 @@ weather_response = get_weather("Hanoi")
 print(weather_response) 
 ```
 
+#### By subclassing Tool:
+
+```python
+from openagentkit.core.tools.base_tool import Tool
+
+class GetWeather(Tool):
+    """
+    A tool to get the current weather of a city.
+    """
+    def __call__(self, city: str) -> str:
+        """
+        Get the current weather in a city.
+        """
+        # Simulate a weather API call
+        return f"The current weather in {city} is sunny with a temperature of 25°C."
+    
+get_weather = GetWeather()
+
+# Get the tool schema
+print(get_weather.schema)
+
+# Run the tool like any other function
+weather_response = get_weather("Hanoi")
+print(weather_response) 
+```
+
 ### Custom Context Store
 
 An Agent must have access to context (chat) history to be truly an agent. OpenAgentKit has a ContextStore module that supports various cache providers (Redis, Valkey) and a quick module for testing (InMemory)
@@ -265,32 +291,6 @@ if __name__ == "__main__":
     print(context_store.get_agent_context(agent.agent_id))
     # Get Context from thread_id
     print(context_store.get_context("new_context"))
-```
-
-#### By subclassing Tool:
-
-```python
-from openagentkit.core.tools.base_tool import Tool
-
-class GetWeather(Tool):
-    """
-    A tool to get the current weather of a city.
-    """
-    def __call__(self, city: str) -> str:
-        """
-        Get the current weather in a city.
-        """
-        # Simulate a weather API call
-        return f"The current weather in {city} is sunny with a temperature of 25°C."
-    
-get_weather = GetWeather()
-
-# Get the tool schema
-print(get_weather.schema)
-
-# Run the tool like any other function
-weather_response = get_weather("Hanoi")
-print(weather_response) 
 ```
 
 ## Contributing
