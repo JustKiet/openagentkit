@@ -1,0 +1,16 @@
+from openagentkit.core.interfaces import BaseRerankerModel as BaseRerankerModel
+from openagentkit.core.models.io.reranking import RerankingUnit as RerankingUnit
+from openagentkit.core.models.responses.reranking_response import RerankingResponse as RerankingResponse
+from typing import Literal, overload
+from voyageai.client import Client
+
+class VoyageAIRerankerModel(BaseRerankerModel):
+    def __init__(self, client: Client | None = None, api_key: str | None = ..., reranking_model: Literal['rerank-2', 'rerank-2-lite'] = 'rerank-2') -> None: ...
+    @property
+    def reranking_model(self) -> str: ...
+    @reranking_model.setter
+    def reranking_model(self, value: str) -> None: ...
+    @overload
+    def rerank(self, query: str, items: list[str], top_k: int, include_metadata: Literal[True]) -> RerankingResponse: ...
+    @overload
+    def rerank(self, query: str, items: list[str], top_k: int, include_metadata: Literal[False]) -> list[RerankingUnit]: ...
