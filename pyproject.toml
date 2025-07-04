@@ -1,3 +1,78 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "openagentkit"
+version = "0.1.0-alpha.5"
+description = "An open-source framework for building and deploying AI agents."
+readme = "README.md"
+authors = [
+    {name = "Kiet Do", email = "kietdohuu@gmail.com"}
+]
+keywords = ["AI", "agents", "open-source", "llm", "tools", "executors"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+requires-python = ">=3.11"
+dependencies = [
+    "scipy==1.16.0",
+    "pydantic==2.11.3",
+    "mcp[cli]==1.6.0",
+    "httpx==0.28.1",
+]
+
+[project.optional-dependencies]
+openai = [
+    "openai>=1.79.0",
+    "tiktoken",
+]
+milvus = [
+    "pymilvus",
+]
+voyageai = [
+    "voyageai",
+    "packaging>=23.2,<=24.0",
+]
+redis = [
+    "redis",
+]
+valkey = [
+    "valkey",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "mypy>=1.0.0",
+]
+all = [
+    "openai>=1.79.0",
+    "tiktoken",
+    "pymilvus",
+    "voyageai",
+    "packaging>=23.2,<=24.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/JustKiet/openagentkit"
+"Bug Reports" = "https://github.com/JustKiet/openagentkit/issues"
+Source = "https://github.com/JustKiet/openagentkit"
+Documentation = "https://github.com/JustKiet/openagentkit#readme"
+
+[tool.setuptools.packages.find]
+include = ["openagentkit*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.txt", "*.md"]
+
+[tool.setuptools]
+license-files = []

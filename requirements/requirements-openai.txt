@@ -74,7 +74,7 @@ numpy==2.2.4
     # via
     #   -r ./requirements/requirements-core.txt
     #   scipy
-openai==1.79.0
+openai>=1.79.0
     # via -r ./requirements/requirements-openai.in
 pydantic==2.11.3
     # via

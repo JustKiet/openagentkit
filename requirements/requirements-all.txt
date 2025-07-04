@@ -107,8 +107,10 @@ numpy==2.2.4
     #   voyageai
 openai==1.79.0
     # via -r /Users/justkiet/Coding/openagentkit/requirements/requirements-openai.in
-packaging==25.0
-    # via huggingface-hub
+packaging==24.0
+    # via
+    #   -r /Users/justkiet/Coding/openagentkit/requirements/requirements-voyageai.in
+    #   huggingface-hub
 pandas==2.2.3
     # via pymilvus
 pillow==11.2.1
