@@ -121,7 +121,11 @@ class ValkeyContextStore(BaseContextStore):
         )
 
         if set_result is None: # set with nx=True returns None if key already exists
-            raise OperationNotAllowedError(f"Context with thread ID {thread_id} already exists.")
+            # Check if agent_id does not match an existing context
+            existing_context = self._get_context_from_valkey(thread_id)
+            if existing_context and existing_context.agent_id != agent_id:
+                logger.error(f"Context with thread ID {thread_id} already exists for agent {existing_context.agent_id}.")
+                raise OperationNotAllowedError(f"Context with thread ID {thread_id} already exists.")
 
         return new_context
 

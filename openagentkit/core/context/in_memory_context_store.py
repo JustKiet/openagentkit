@@ -61,8 +61,9 @@ class InMemoryContextStore(BaseContextStore):
         thread_lock = self._get_or_create_thread_lock(thread_id)
         with thread_lock: # Acquire lock specific to this thread_id
             if thread_id in self._storage: # Check again under the lock
-                raise OperationNotAllowedError(f"Context with thread ID {thread_id} already exists.")
-            
+                if self._storage[thread_id].agent_id != agent_id:
+                    raise OperationNotAllowedError(f"Context with thread ID {thread_id} already exists.")
+                
             self._storage[thread_id] = ContextUnit(
                 thread_id=thread_id,
                 agent_id=agent_id,
