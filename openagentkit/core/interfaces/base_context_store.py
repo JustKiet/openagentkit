@@ -28,7 +28,7 @@ class BaseContextStore(ABC):
     @abstractmethod
     def init_context(self, thread_id: str, agent_id: str, system_message: str) -> ContextUnit:
         """
-        Initialize the context for the given thread ID.
+        Initialize the context for the given thread ID. If the context already exists, it will return the existing context (Only if the agent_id matches).
 
         :param str thread_id: The ID of the context to initialize.
         :param str agent_id: The ID of the agent associated with the context.

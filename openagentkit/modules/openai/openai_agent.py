@@ -103,6 +103,16 @@ class OpenAIAgent(BaseAgent):
         return self._llm_service.tools
     
     @property
+    def tool_handler(self) -> ToolHandler:
+        """
+        Get the tool handler for the agent.
+
+        Returns:
+            The tool handler.
+        """
+        return self._tool_handler
+    
+    @property
     def thread_id(self) -> str:
         """
         Get the thread ID for the agent.
@@ -181,6 +191,13 @@ class OpenAIAgent(BaseAgent):
         
         if thread_id != self._thread_id:
             self.context_store.init_context(
+                thread_id=thread_id,
+                agent_id=self._agent_id,
+                system_message=self._system_message,
+            )
+        
+        if self.context_store.get_system_message(thread_id=thread_id) != self._system_message:
+            self.context_store.update_system_message(
                 thread_id=thread_id,
                 agent_id=self._agent_id,
                 system_message=self._system_message,

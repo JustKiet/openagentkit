@@ -129,10 +129,16 @@ class RedisContextStore(BaseContextStore):
         if set_result is None: # set with nx=True returns None if key already exists
             # Check if agent_id does not match an existing context
             existing_context = self._get_context_from_redis(thread_id)
-            if existing_context and existing_context.agent_id != agent_id:
-                logger.error(f"Context with thread ID {thread_id} already exists for agent {existing_context.agent_id}.")
-                raise OperationNotAllowedError(f"Context with thread ID {thread_id} already exists.")
-
+            if existing_context:
+                if existing_context.agent_id != agent_id:
+                    logger.error(f"Context with thread ID {thread_id} already exists for agent {existing_context.agent_id}.")
+                    raise OperationNotAllowedError(f"Context with thread ID {thread_id} already exists.")
+            
+                if system_message != existing_context.system_message:
+                    self.update_system_message(thread_id, agent_id, system_message) # Update system message if it differs
+            
+                return existing_context
+        
         return new_context
 
     def get_context(self, thread_id: str) -> Optional[ContextUnit]:

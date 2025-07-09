@@ -64,6 +64,17 @@ class InMemoryContextStore(BaseContextStore):
                 if self._storage[thread_id].agent_id != agent_id:
                     raise OperationNotAllowedError(f"Context with thread ID {thread_id} already exists.")
                 
+                if system_message != self._storage[thread_id].system_message:
+                    for message in self._storage[thread_id].history:
+                        if message['role'] == 'system':
+                            message['content'] = system_message
+                            break
+                    else:
+                        self._storage[thread_id].history.insert(0, {"role": "system", "content": system_message})
+                    self._storage[thread_id].updated_at = int(datetime.now().timestamp())
+                
+                return self._storage[thread_id] # Return existing context if it matches agent_id
+            
             self._storage[thread_id] = ContextUnit(
                 thread_id=thread_id,
                 agent_id=agent_id,
