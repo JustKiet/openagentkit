@@ -104,6 +104,16 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
     @property
     def tools(self) -> List[Dict[str, Any]] | None:
         return self._llm_service.tools
+    
+    @property
+    def tool_handler(self) -> ToolHandler:
+        """
+        Get the tool handler for the agent.
+
+        Returns:
+            The tool handler.
+        """
+        return self._tool_handler
 
     async def connect_to_mcp(self, mcp_sessions: list[ClientSession]) -> None:
         self._tool_handler = await ToolHandler.from_mcp(sessions=mcp_sessions, additional_tools=self._tools)
@@ -188,6 +198,13 @@ class AsyncOpenAIAgent(AsyncBaseAgent):
 
         if thread_id != self._thread_id:
             self.context_store.init_context(
+                thread_id=thread_id,
+                agent_id=self._agent_id,
+                system_message=self._system_message,
+            )
+
+        if self.context_store.get_system_message(thread_id=thread_id) != self._system_message:
+            self.context_store.update_system_message(
                 thread_id=thread_id,
                 agent_id=self._agent_id,
                 system_message=self._system_message,

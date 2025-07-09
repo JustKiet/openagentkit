@@ -8,3 +8,12 @@ class ContextUnit(BaseModel):
     created_at: int
     updated_at: int
 
+    @property
+    def system_message(self) -> str:
+        """
+        Get the system message for the context unit.
+
+        Returns:
+            The system message.
+        """
+        return self.history[0].get("system_message", "")

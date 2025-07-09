@@ -18,7 +18,7 @@ class ToolHandler:
                  mcp_tools: Optional[dict[str, list[str]]] = None,
                  ):
         self._tools: Optional[list[dict[str, Any]]] = None
-        self.tools_map: Optional[dict[str, Union[Tool, dict[str, str]]]] = None
+        self._tools_map: Optional[dict[str, Union[Tool, dict[str, str]]]] = None
 
         if tools:
             self._tools = []
@@ -26,7 +26,7 @@ class ToolHandler:
                 if not hasattr(tool, "schema"):
                     raise ValueError(f"Function '{tool.__name__}' does not have a `schema` attribute. Please wrap the function with `@tool` decorator from `openagentkit.core.tools.base_tool`.")
                 self._tools.append(tool.schema)
-                self.tools_map = {
+                self._tools_map = {
                     tool.schema["function"]["name"]: tool for tool in tools
                 }
 
@@ -84,13 +84,13 @@ class ToolHandler:
 
         if self._tools is None:
             self._tools = []
-        if self.tools_map is None:
-            self.tools_map = {}
+        if self._tools_map is None:
+            self._tools_map = {}
         # Extend the existing tools with the loaded MCP tools
         self._tools.extend(mcp_tools)
 
         # Update the tools map with the loaded MCP tools
-        self.tools_map.update({
+        self._tools_map.update({
             tool["function"]["name"]: tool for tool in mcp_tools
         })
         
@@ -98,12 +98,71 @@ class ToolHandler:
     def tools(self):
         return self._tools
     
-    @tools.setter
-    def tools(self, tools: List[Tool]):
-        self._tools = [tool.schema for tool in tools]
-        self.tools_map: Optional[dict[str, Union[Tool, dict[str, str]]]] = {
-            tool.schema["function"]["name"]: tool for tool in tools
-        }
+    @property
+    def tools_map(self):
+        return self._tools_map
+
+    def add_tool(self, tool: Tool):
+        if not self._tools:
+            self._tools = []
+        if not self._tools_map:
+            self._tools_map = {}
+            
+        self._tools.append(tool.schema)
+        self._tools_map[tool.schema["function"]["name"]] = tool
+
+    def remove_tool(self, tool_name: str):
+        if self._tools is None or self._tools_map is None:
+            logger.error("No tools provided")
+            return
+        
+        if tool_name in self._tools_map:
+            del self._tools_map[tool_name]
+            self._tools = [tool for tool in self._tools if tool["function"]["name"] != tool_name]
+        else:
+            logger.error(f"Tool '{tool_name}' not found in tools map.")
+
+    def get_tool(self, tool_name: str) -> Optional[Tool]:
+        if self._tools_map is None:
+            logger.error("No tools provided")
+            return None
+        
+        tool = self._tools_map.get(tool_name, None)
+        if not tool:
+            logger.error(f"Tool '{tool_name}' not found in tools map.")
+            return None
+        
+        if isinstance(tool, Tool):
+            return tool
+        else:
+            logger.error(f"Tool '{tool_name}' is not an instance of Tool class.")
+            return None
+        
+    def update_tool(self, tool: Tool):
+        """
+        Update an existing tool in the tool handler.
+        
+        :param tool: The tool to update.
+        """
+        if self._tools is None or self._tools_map is None:
+            logger.error("No tools provided")
+            return
+        
+        if tool.schema["function"]["name"] in self._tools_map:
+            self._tools_map[tool.schema["function"]["name"]] = tool
+            for i, existing_tool in enumerate(self._tools):
+                if existing_tool["function"]["name"] == tool.schema["function"]["name"]:
+                    self._tools[i] = tool.schema
+                    break
+        else:
+            logger.error(f"Tool '{tool.schema['function']['name']}' not found in tools map.")
+        
+    def clear_tools(self):
+        """
+        Clear all tools from the tool handler.
+        """
+        self._tools = []
+        self._tools_map = {}
 
     async def _handle_mcp_tool_call(self, tool_name: str, **kwargs: Any) -> Any:
         tool_arguments = kwargs
@@ -124,11 +183,11 @@ class ToolHandler:
                 return str([tool_result.model_dump() for tool_result in tool_results.content])
             
     async def _async_handle_tool_call(self, tool_name: str, **kwargs: Any) -> Any:
-        if self.tools_map is None:
+        if self._tools_map is None:
             logger.error("No tools provided")
             return None
 
-        tool = self.tools_map.get(tool_name)
+        tool = self._tools_map.get(tool_name)
         if not tool:
             return None
 
@@ -142,8 +201,8 @@ class ToolHandler:
         return await self._handle_mcp_tool_call(tool_name, **kwargs)
         
     def _handle_tool_call(self, tool_name: str, **kwargs: Any) -> Any:
-        if self.tools_map is not None:
-            tool = self.tools_map.get(tool_name, None)
+        if self._tools_map is not None:
+            tool = self._tools_map.get(tool_name, None)
             if not tool:
                 return None
             elif callable(tool):
