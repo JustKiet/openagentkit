@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "openagentkit"
-version = "0.1.0-alpha.13"
+version = "0.1.0-alpha.14"
 description = "An open-source framework for building and deploying AI agents."
 readme = "README.md"
 authors = [
@@ -23,10 +23,10 @@ classifiers = [
 ]
 requires-python = ">=3.11"
 dependencies = [
-    "scipy==1.16.0",
-    "pydantic==2.11.3",
-    "mcp[cli]==1.6.0",
-    "httpx==0.28.1",
+    "scipy>=1.16.0",
+    "pydantic>=2.11.3",
+    "mcp[cli]>=1.6.0",
+    "httpx>=0.28.1",
 ]
 
 [project.optional-dependencies]
